@@ -31,7 +31,7 @@ class SecurityConfig {
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }  // Stateless session
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/v1/auth/**").permitAll()  // Allow anonymous access to auth endpoints
+                    .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()  // Allow anonymous access to auth endpoints
                     .anyRequest().authenticated()  // All other endpoints require authentication
             }
             .httpBasic { it.disable() }  // Disable basic auth

@@ -1,6 +1,7 @@
 package com.pashaoleynik97.droiddeploy.rest.controller
 
 import com.pashaoleynik97.droiddeploy.rest.model.auth.LoginRequestDto
+import com.pashaoleynik97.droiddeploy.rest.model.auth.RefreshTokenRequestDto
 import com.pashaoleynik97.droiddeploy.rest.model.auth.TokenPairDto
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
 import com.pashaoleynik97.droiddeploy.rest.service.AuthService
@@ -31,5 +32,18 @@ class AuthController(
         return ResponseEntity
             .status(HttpStatus.OK)
             .body(RestResponse.success(tokenPair, "Login successful"))
+    }
+
+    @PostMapping("/refresh")
+    fun refresh(@RequestBody request: RefreshTokenRequestDto): ResponseEntity<RestResponse<TokenPairDto>> {
+        logger.info { "POST /api/v1/auth/refresh - Refresh token request received" }
+
+        val tokenPair = authService.refreshToken(request)
+
+        logger.info { "Refresh token successful" }
+
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(RestResponse.success(tokenPair, "Token refreshed successfully"))
     }
 }

@@ -3,11 +3,14 @@ package com.pashaoleynik97.droiddeploy.service.auth
 import com.pashaoleynik97.droiddeploy.core.domain.User
 import com.pashaoleynik97.droiddeploy.core.domain.UserRole
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidCredentialsException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
 import com.pashaoleynik97.droiddeploy.rest.model.auth.LoginRequestDto
+import com.pashaoleynik97.droiddeploy.rest.model.auth.RefreshTokenRequestDto
 import com.pashaoleynik97.droiddeploy.security.JwtTokenProvider
+import io.jsonwebtoken.Claims
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -211,13 +214,219 @@ class AuthServiceImplTest {
         verify(userRepository).findByLogin(request.login)
     }
 
+    @Test
+    fun `refreshToken should return new token pair for valid refresh token`() {
+        // Given
+        val userId = UUID.randomUUID()
+        val user = createTestUser(id = userId, role = UserRole.ADMIN, isActive = true, tokenVersion = 0)
+        val request = RefreshTokenRequestDto(refreshToken = "valid.refresh.token")
+        val claims = mock<Claims>()
+        val tokenPair = createTestTokenPair()
+
+        whenever(jwtTokenProvider.validateAndParseClaims(request.refreshToken)).thenReturn(claims)
+        whenever(jwtTokenProvider.getTokenType(claims)).thenReturn("refresh")
+        whenever(jwtTokenProvider.getRole(claims)).thenReturn(UserRole.ADMIN.name)
+        whenever(jwtTokenProvider.extractUserId(claims)).thenReturn(userId)
+        whenever(jwtTokenProvider.getTokenVersion(claims)).thenReturn(0)
+        whenever(userRepository.findById(userId)).thenReturn(user)
+        whenever(jwtTokenProvider.generateTokenPairForAdmin(user)).thenReturn(tokenPair)
+
+        // When
+        val result = authService.refreshToken(request)
+
+        // Then
+        assertNotNull(result)
+        assertEquals(tokenPair.accessToken, result.accessToken)
+        assertEquals(tokenPair.refreshToken, result.refreshToken)
+
+        verify(jwtTokenProvider).validateAndParseClaims(request.refreshToken)
+        verify(jwtTokenProvider).getTokenType(claims)
+        verify(jwtTokenProvider).getRole(claims)
+        verify(jwtTokenProvider).extractUserId(claims)
+        verify(jwtTokenProvider).getTokenVersion(claims)
+        verify(userRepository).findById(userId)
+        verify(jwtTokenProvider).generateTokenPairForAdmin(user)
+    }
+
+    @Test
+    fun `refreshToken should throw InvalidRefreshTokenException when token validation fails`() {
+        // Given
+        val request = RefreshTokenRequestDto(refreshToken = "invalid.token")
+
+        whenever(jwtTokenProvider.validateAndParseClaims(request.refreshToken)).thenReturn(null)
+
+        // When & Then
+        assertThrows<InvalidRefreshTokenException> {
+            authService.refreshToken(request)
+        }
+
+        verify(jwtTokenProvider).validateAndParseClaims(request.refreshToken)
+        verify(jwtTokenProvider, never()).getTokenType(any())
+        verify(userRepository, never()).findById(any())
+    }
+
+    @Test
+    fun `refreshToken should throw InvalidRefreshTokenException when token type is not refresh`() {
+        // Given
+        val request = RefreshTokenRequestDto(refreshToken = "access.token")
+        val claims = mock<Claims>()
+
+        whenever(jwtTokenProvider.validateAndParseClaims(request.refreshToken)).thenReturn(claims)
+        whenever(jwtTokenProvider.getTokenType(claims)).thenReturn("access")
+
+        // When & Then
+        assertThrows<InvalidRefreshTokenException> {
+            authService.refreshToken(request)
+        }
+
+        verify(jwtTokenProvider).validateAndParseClaims(request.refreshToken)
+        verify(jwtTokenProvider).getTokenType(claims)
+        verify(jwtTokenProvider, never()).getRole(any())
+    }
+
+    @Test
+    fun `refreshToken should throw InvalidRefreshTokenException when role is not ADMIN`() {
+        // Given
+        val request = RefreshTokenRequestDto(refreshToken = "ci.refresh.token")
+        val claims = mock<Claims>()
+
+        whenever(jwtTokenProvider.validateAndParseClaims(request.refreshToken)).thenReturn(claims)
+        whenever(jwtTokenProvider.getTokenType(claims)).thenReturn("refresh")
+        whenever(jwtTokenProvider.getRole(claims)).thenReturn(UserRole.CI.name)
+
+        // When & Then
+        assertThrows<InvalidRefreshTokenException> {
+            authService.refreshToken(request)
+        }
+
+        verify(jwtTokenProvider).validateAndParseClaims(request.refreshToken)
+        verify(jwtTokenProvider).getTokenType(claims)
+        verify(jwtTokenProvider).getRole(claims)
+        verify(jwtTokenProvider, never()).extractUserId(any())
+    }
+
+    @Test
+    fun `refreshToken should throw InvalidRefreshTokenException when userId cannot be extracted`() {
+        // Given
+        val request = RefreshTokenRequestDto(refreshToken = "invalid.subject.token")
+        val claims = mock<Claims>()
+
+        whenever(jwtTokenProvider.validateAndParseClaims(request.refreshToken)).thenReturn(claims)
+        whenever(jwtTokenProvider.getTokenType(claims)).thenReturn("refresh")
+        whenever(jwtTokenProvider.getRole(claims)).thenReturn(UserRole.ADMIN.name)
+        whenever(jwtTokenProvider.extractUserId(claims)).thenReturn(null)
+
+        // When & Then
+        assertThrows<InvalidRefreshTokenException> {
+            authService.refreshToken(request)
+        }
+
+        verify(jwtTokenProvider).validateAndParseClaims(request.refreshToken)
+        verify(jwtTokenProvider).extractUserId(claims)
+        verify(userRepository, never()).findById(any())
+    }
+
+    @Test
+    fun `refreshToken should throw InvalidRefreshTokenException when user not found`() {
+        // Given
+        val userId = UUID.randomUUID()
+        val request = RefreshTokenRequestDto(refreshToken = "valid.token")
+        val claims = mock<Claims>()
+
+        whenever(jwtTokenProvider.validateAndParseClaims(request.refreshToken)).thenReturn(claims)
+        whenever(jwtTokenProvider.getTokenType(claims)).thenReturn("refresh")
+        whenever(jwtTokenProvider.getRole(claims)).thenReturn(UserRole.ADMIN.name)
+        whenever(jwtTokenProvider.extractUserId(claims)).thenReturn(userId)
+        whenever(userRepository.findById(userId)).thenReturn(null)
+
+        // When & Then
+        assertThrows<InvalidRefreshTokenException> {
+            authService.refreshToken(request)
+        }
+
+        verify(userRepository).findById(userId)
+        verify(jwtTokenProvider, never()).generateTokenPairForAdmin(any())
+    }
+
+    @Test
+    fun `refreshToken should throw InvalidRefreshTokenException when user is not active`() {
+        // Given
+        val userId = UUID.randomUUID()
+        val user = createTestUser(id = userId, role = UserRole.ADMIN, isActive = false)
+        val request = RefreshTokenRequestDto(refreshToken = "valid.token")
+        val claims = mock<Claims>()
+
+        whenever(jwtTokenProvider.validateAndParseClaims(request.refreshToken)).thenReturn(claims)
+        whenever(jwtTokenProvider.getTokenType(claims)).thenReturn("refresh")
+        whenever(jwtTokenProvider.getRole(claims)).thenReturn(UserRole.ADMIN.name)
+        whenever(jwtTokenProvider.extractUserId(claims)).thenReturn(userId)
+        whenever(userRepository.findById(userId)).thenReturn(user)
+
+        // When & Then
+        assertThrows<InvalidRefreshTokenException> {
+            authService.refreshToken(request)
+        }
+
+        verify(userRepository).findById(userId)
+        verify(jwtTokenProvider, never()).generateTokenPairForAdmin(any())
+    }
+
+    @Test
+    fun `refreshToken should throw InvalidRefreshTokenException when user role is not ADMIN`() {
+        // Given
+        val userId = UUID.randomUUID()
+        val user = createTestUser(id = userId, role = UserRole.CI, isActive = true)
+        val request = RefreshTokenRequestDto(refreshToken = "valid.token")
+        val claims = mock<Claims>()
+
+        whenever(jwtTokenProvider.validateAndParseClaims(request.refreshToken)).thenReturn(claims)
+        whenever(jwtTokenProvider.getTokenType(claims)).thenReturn("refresh")
+        whenever(jwtTokenProvider.getRole(claims)).thenReturn(UserRole.ADMIN.name)
+        whenever(jwtTokenProvider.extractUserId(claims)).thenReturn(userId)
+        whenever(userRepository.findById(userId)).thenReturn(user)
+
+        // When & Then
+        assertThrows<InvalidRefreshTokenException> {
+            authService.refreshToken(request)
+        }
+
+        verify(userRepository).findById(userId)
+        verify(jwtTokenProvider, never()).generateTokenPairForAdmin(any())
+    }
+
+    @Test
+    fun `refreshToken should throw InvalidRefreshTokenException when token version mismatch`() {
+        // Given
+        val userId = UUID.randomUUID()
+        val user = createTestUser(id = userId, role = UserRole.ADMIN, isActive = true, tokenVersion = 2)
+        val request = RefreshTokenRequestDto(refreshToken = "old.token")
+        val claims = mock<Claims>()
+
+        whenever(jwtTokenProvider.validateAndParseClaims(request.refreshToken)).thenReturn(claims)
+        whenever(jwtTokenProvider.getTokenType(claims)).thenReturn("refresh")
+        whenever(jwtTokenProvider.getRole(claims)).thenReturn(UserRole.ADMIN.name)
+        whenever(jwtTokenProvider.extractUserId(claims)).thenReturn(userId)
+        whenever(jwtTokenProvider.getTokenVersion(claims)).thenReturn(1)
+        whenever(userRepository.findById(userId)).thenReturn(user)
+
+        // When & Then
+        assertThrows<InvalidRefreshTokenException> {
+            authService.refreshToken(request)
+        }
+
+        verify(userRepository).findById(userId)
+        verify(jwtTokenProvider).getTokenVersion(claims)
+        verify(jwtTokenProvider, never()).generateTokenPairForAdmin(any())
+    }
+
     private fun createTestUser(
         id: UUID = UUID.randomUUID(),
         login: String = "test_user",
         passwordHash: String? = "hashedPassword",
         role: UserRole = UserRole.ADMIN,
         isActive: Boolean = true,
-        lastLoginAt: Instant? = null
+        lastLoginAt: Instant? = null,
+        tokenVersion: Int = 0
     ) = User(
         id = id,
         login = login,
@@ -228,7 +437,7 @@ class AuthServiceImplTest {
         updatedAt = Instant.now(),
         lastLoginAt = lastLoginAt,
         lastInteractionAt = null,
-        tokenVersion = 0
+        tokenVersion = tokenVersion
     )
 
     private fun createTestTokenPair() = JwtTokenProvider.TokenPair(

@@ -2,6 +2,7 @@ package com.pashaoleynik97.droiddeploy.rest.handler
 
 import com.pashaoleynik97.droiddeploy.core.exception.DroidDeployException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidCredentialsException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestError
@@ -29,6 +30,20 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.UNAUTHORIZED)
             .body(RestResponse.failure(error, "Authentication failed"))
+    }
+
+    @ExceptionHandler(InvalidRefreshTokenException::class)
+    fun handleInvalidRefreshToken(ex: InvalidRefreshTokenException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid refresh token exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = "Invalid or expired refresh token"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Token refresh failed"))
     }
 
     @ExceptionHandler(UserNotActiveException::class)
