@@ -5,12 +5,18 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
+import java.util.TimeZone
 
 @SpringBootTest
 @ActiveProfiles("test")
 abstract class AbstractIntegrationTest {
 
     companion object {
+        init {
+            // Set UTC timezone for tests to avoid timezone issues
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        }
+
         private val postgresContainer = PostgreSQLContainer("postgres:15")
             .withDatabaseName("testdb")
             .withUsername("test")
@@ -22,7 +28,9 @@ abstract class AbstractIntegrationTest {
         @JvmStatic
         @DynamicPropertySource
         fun configureProperties(registry: DynamicPropertyRegistry) {
-            registry.add("spring.datasource.url", postgresContainer::getJdbcUrl)
+            registry.add("spring.datasource.url") {
+                "${postgresContainer.jdbcUrl}&timezone=UTC"
+            }
             registry.add("spring.datasource.username", postgresContainer::getUsername)
             registry.add("spring.datasource.password", postgresContainer::getPassword)
         }
