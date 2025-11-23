@@ -8,15 +8,20 @@ plugins {
 dependencies {
     implementation(project(":droiddeploy-core"))
     implementation(project(":droiddeploy-db"))
+    implementation(project(":droiddeploy-rest"))
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-
-    // Security for password encoding
-    implementation("org.springframework.security:spring-security-crypto")
 
     // Kotlin logging
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
+
+    // JWT
+    implementation("io.jsonwebtoken:jjwt-api:0.12.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
 
     // Database driver
     runtimeOnly("org.postgresql:postgresql")
@@ -27,6 +32,7 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
     testImplementation("org.testcontainers:testcontainers:1.19.3")
     testImplementation("org.testcontainers:postgresql:1.19.3")
     testImplementation("org.testcontainers:junit-jupiter:1.19.3")
