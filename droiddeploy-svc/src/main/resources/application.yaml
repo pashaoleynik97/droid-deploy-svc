@@ -21,3 +21,7 @@ spring:
     baseline-on-migrate: true
     locations: classpath:db/migration
     schemas: public
+
+user-defaults:
+  super-admin-login: ${SUPER_ADMIN_LOGIN:super_admin}
+  super-admin-password: ${SUPER_ADMIN_PWD:DdSUadmPwd&^1_z}

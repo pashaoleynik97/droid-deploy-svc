@@ -1,0 +1,3 @@
+user-defaults:
+  super-admin-login: test_admin
+  super-admin-password: test_password
