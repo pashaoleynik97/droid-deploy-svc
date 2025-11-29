@@ -1,6 +1,7 @@
 package com.pashaoleynik97.droiddeploy.rest.handler
 
 import com.pashaoleynik97.droiddeploy.core.exception.DroidDeployException
+import com.pashaoleynik97.droiddeploy.core.exception.ForbiddenAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidCredentialsException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidLoginFormatException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
@@ -9,6 +10,7 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
 import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
+import com.pashaoleynik97.droiddeploy.core.exception.UserNotFoundException
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestError
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
 import mu.KotlinLogging
@@ -132,6 +134,34 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
             .body(RestResponse.failure(error, "User creation failed"))
+    }
+
+    @ExceptionHandler(UserNotFoundException::class)
+    fun handleUserNotFound(ex: UserNotFoundException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "User not found exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.NOT_FOUND,
+            message = ex.message ?: "User not found"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(RestResponse.failure(error, "User not found"))
+    }
+
+    @ExceptionHandler(ForbiddenAccessException::class)
+    fun handleForbiddenAccess(ex: ForbiddenAccessException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Forbidden access exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHORIZATION,
+            message = ex.message ?: "Access denied"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
+            .body(RestResponse.failure(error, "Access denied"))
     }
 
     @ExceptionHandler(DroidDeployException::class)
