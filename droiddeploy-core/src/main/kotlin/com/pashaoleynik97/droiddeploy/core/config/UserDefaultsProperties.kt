@@ -1,4 +1,4 @@
-package com.pashaoleynik97.droiddeploy.config
+package com.pashaoleynik97.droiddeploy.core.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 

@@ -1,5 +1,6 @@
 package com.pashaoleynik97.droiddeploy.config
 
+import com.pashaoleynik97.droiddeploy.core.config.UserDefaultsProperties
 import com.pashaoleynik97.droiddeploy.core.domain.UserRole
 import com.pashaoleynik97.droiddeploy.core.service.UserService
 import mu.KotlinLogging

@@ -7,6 +7,7 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
 import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
+import com.pashaoleynik97.droiddeploy.service.user.UserServiceImpl
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

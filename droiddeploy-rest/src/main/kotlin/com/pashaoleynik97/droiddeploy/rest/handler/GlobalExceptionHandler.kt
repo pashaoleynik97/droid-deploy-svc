@@ -7,6 +7,7 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidLoginFormatException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidUserTypeException
 import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
@@ -135,6 +136,20 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
             .body(RestResponse.failure(error, "User creation failed"))
+    }
+
+    @ExceptionHandler(InvalidUserTypeException::class)
+    fun handleInvalidUserType(ex: InvalidUserTypeException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid user type exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Invalid user type for this operation"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Operation failed"))
     }
 
     @ExceptionHandler(UserNotFoundException::class)

@@ -1,10 +1,12 @@
 package com.pashaoleynik97.droiddeploy.rest.controller
 
+import com.pashaoleynik97.droiddeploy.core.config.UserDefaultsProperties
 import com.pashaoleynik97.droiddeploy.core.domain.UserRole
 import com.pashaoleynik97.droiddeploy.core.exception.ForbiddenAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotFoundException
 import com.pashaoleynik97.droiddeploy.core.service.UserService
 import com.pashaoleynik97.droiddeploy.rest.model.user.CreateUserRequestDto
+import com.pashaoleynik97.droiddeploy.rest.model.user.UpdatePasswordRequestDto
 import com.pashaoleynik97.droiddeploy.rest.model.user.UserResponseDto
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.PagedResponse
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
@@ -24,7 +26,8 @@ private val logger = KotlinLogging.logger {}
 @RestController
 @RequestMapping("/api/v1/user")
 class UserController(
-    private val userService: UserService
+    private val userService: UserService,
+    private val userDefaultsProperties: UserDefaultsProperties
 ) {
 
     @GetMapping
@@ -114,5 +117,34 @@ class UserController(
         return ResponseEntity
             .status(HttpStatus.OK)
             .body(RestResponse.success(responseDto, "User retrieved successfully"))
+    }
+
+    @PutMapping("/{userId}/password")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun updatePassword(
+        @PathVariable userId: UUID,
+        @RequestBody request: UpdatePasswordRequestDto,
+        @AuthenticationPrincipal authentication: JwtAuthentication
+    ): ResponseEntity<RestResponse<Unit>> {
+        logger.info { "PUT /api/v1/user/$userId/password - Update password request from user: ${authentication.userId}, role: ${authentication.userRole}" }
+
+        // Check if current user is super admin
+        val superAdmin = userService.findByLogin(userDefaultsProperties.superAdminLogin)
+        val isSuperAdmin = superAdmin?.id == authentication.userId
+
+        // Authorization check: Super admin can update any ADMIN user's password, regular admin can only update their own
+        if (!isSuperAdmin && authentication.userId != userId) {
+            logger.warn { "User ${authentication.userId} attempted to update password for user $userId without permission" }
+            throw ForbiddenAccessException("You can only update your own password")
+        }
+
+        // Update password (this will validate user exists, is ADMIN, and password strength)
+        userService.updatePassword(userId, request.newPassword)
+
+        logger.info { "Password updated successfully for user: $userId by user: ${authentication.userId}" }
+
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(RestResponse.success(Unit, "Password updated successfully"))
     }
 }

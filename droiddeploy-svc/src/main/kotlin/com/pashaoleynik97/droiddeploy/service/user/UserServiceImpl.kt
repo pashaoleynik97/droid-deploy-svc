@@ -1,13 +1,16 @@
-package com.pashaoleynik97.droiddeploy.service
+package com.pashaoleynik97.droiddeploy.service.user
 
 import com.pashaoleynik97.droiddeploy.core.domain.User
 import com.pashaoleynik97.droiddeploy.core.domain.UserRole
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidLoginFormatException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidUserTypeException
 import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
+import com.pashaoleynik97.droiddeploy.core.exception.UserNotFoundException
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
 import com.pashaoleynik97.droiddeploy.core.service.UserService
+import com.pashaoleynik97.droiddeploy.core.utils.CredentialsValidator
 import mu.KotlinLogging
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -34,8 +37,7 @@ class UserServiceImpl(
         }
 
         // Validate login format (3-20 chars, alphanumeric + underscore/dash)
-        val loginPattern = Regex("^[a-zA-Z0-9_-]{3,20}$")
-        if (!login.matches(loginPattern)) {
+        if (!CredentialsValidator.isLoginValid(login)) {
             logger.warn { "Failed to create user: invalid login format: $login" }
             throw InvalidLoginFormatException()
         }
@@ -47,8 +49,7 @@ class UserServiceImpl(
         }
 
         // Validate password strength (min 10 chars, must contain uppercase, lowercase, digit)
-        val passwordPattern = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{10,}$")
-        if (!password.matches(passwordPattern)) {
+        if (!CredentialsValidator.isPasswordValid(password)) {
             logger.warn { "Failed to create user: password doesn't meet security requirements" }
             throw InvalidPasswordException()
         }
@@ -98,5 +99,36 @@ class UserServiceImpl(
         val users = userRepository.findAll(role, isActive, pageable)
         logger.info { "Found ${users.totalElements} users matching filters" }
         return users
+    }
+
+    override fun updatePassword(userId: UUID, newPassword: String): User {
+        logger.debug { "Attempting to update password for user: $userId" }
+
+        // Find user
+        val user = userRepository.findById(userId)
+            ?: throw UserNotFoundException(userId)
+
+        // Check if user is ADMIN (only ADMIN users can have passwords)
+        if (user.role != UserRole.ADMIN) {
+            logger.warn { "Failed to update password: user ${user.id} has role ${user.role}, only ADMIN users can have passwords" }
+            throw InvalidUserTypeException(user.role)
+        }
+
+        // Validate password strength
+        if (!CredentialsValidator.isPasswordValid(newPassword)) {
+            logger.warn { "Failed to update password: password doesn't meet security requirements" }
+            throw InvalidPasswordException()
+        }
+
+        // Update password, increment token version, and update timestamp
+        val updatedUser = user.copy(
+            passwordHash = passwordEncoder.encode(newPassword),
+            tokenVersion = user.tokenVersion + 1,
+            updatedAt = Instant.now()
+        )
+
+        val savedUser = userRepository.save(updatedUser)
+        logger.info { "Password updated successfully for user: ${savedUser.id}, tokenVersion incremented to ${savedUser.tokenVersion}" }
+        return savedUser
     }
 }

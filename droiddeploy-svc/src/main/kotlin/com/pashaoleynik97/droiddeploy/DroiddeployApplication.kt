@@ -1,6 +1,6 @@
 package com.pashaoleynik97.droiddeploy
 
-import com.pashaoleynik97.droiddeploy.config.UserDefaultsProperties
+import com.pashaoleynik97.droiddeploy.core.config.UserDefaultsProperties
 import com.pashaoleynik97.droiddeploy.security.JwtProperties
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
