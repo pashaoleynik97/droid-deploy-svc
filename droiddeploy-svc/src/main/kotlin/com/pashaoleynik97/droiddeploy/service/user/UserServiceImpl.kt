@@ -7,6 +7,8 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidUserTypeException
 import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
+import com.pashaoleynik97.droiddeploy.core.exception.SelfModificationNotAllowedException
+import com.pashaoleynik97.droiddeploy.core.exception.SuperAdminProtectionException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotFoundException
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
 import com.pashaoleynik97.droiddeploy.core.service.UserService
@@ -129,6 +131,38 @@ class UserServiceImpl(
 
         val savedUser = userRepository.save(updatedUser)
         logger.info { "Password updated successfully for user: ${savedUser.id}, tokenVersion incremented to ${savedUser.tokenVersion}" }
+        return savedUser
+    }
+
+    override fun updateActiveStatus(userId: UUID, setActive: Boolean, currentUserId: UUID, superAdminLogin: String): User {
+        logger.debug { "Attempting to update active status for user: $userId to $setActive by user: $currentUserId" }
+
+        // Find user
+        val user = userRepository.findById(userId)
+            ?: throw UserNotFoundException(userId)
+
+        // Check if user is trying to modify their own status
+        if (userId == currentUserId) {
+            logger.warn { "Failed to update active status: user $currentUserId attempted to modify their own status" }
+            throw SelfModificationNotAllowedException()
+        }
+
+        // Check if target user is super admin
+        if (user.login == superAdminLogin) {
+            logger.warn { "Failed to update active status: attempted to modify super admin account" }
+            throw SuperAdminProtectionException()
+        }
+
+        // Update active status, increment token version, and update timestamp
+        val updatedUser = user.copy(
+            isActive = setActive,
+            tokenVersion = user.tokenVersion + 1,
+            updatedAt = Instant.now()
+        )
+
+        val savedUser = userRepository.save(updatedUser)
+        val statusText = if (setActive) "activated" else "deactivated"
+        logger.info { "User ${savedUser.id} $statusText successfully, tokenVersion incremented to ${savedUser.tokenVersion}" }
         return savedUser
     }
 }

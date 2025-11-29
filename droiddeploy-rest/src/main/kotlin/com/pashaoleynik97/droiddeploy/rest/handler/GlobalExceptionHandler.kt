@@ -9,6 +9,8 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenExceptio
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidUserTypeException
 import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
+import com.pashaoleynik97.droiddeploy.core.exception.SelfModificationNotAllowedException
+import com.pashaoleynik97.droiddeploy.core.exception.SuperAdminProtectionException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotFoundException
@@ -149,6 +151,34 @@ class GlobalExceptionHandler {
 
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Operation failed"))
+    }
+
+    @ExceptionHandler(SelfModificationNotAllowedException::class)
+    fun handleSelfModificationNotAllowed(ex: SelfModificationNotAllowedException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Self modification not allowed exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHORIZATION,
+            message = ex.message ?: "You cannot modify your own account"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
+            .body(RestResponse.failure(error, "Operation failed"))
+    }
+
+    @ExceptionHandler(SuperAdminProtectionException::class)
+    fun handleSuperAdminProtection(ex: SuperAdminProtectionException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Super admin protection exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHORIZATION,
+            message = ex.message ?: "Super admin account cannot be modified"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
             .body(RestResponse.failure(error, "Operation failed"))
     }
 

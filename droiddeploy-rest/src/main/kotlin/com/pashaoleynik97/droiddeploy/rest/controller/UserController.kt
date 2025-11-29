@@ -7,6 +7,7 @@ import com.pashaoleynik97.droiddeploy.core.exception.UserNotFoundException
 import com.pashaoleynik97.droiddeploy.core.service.UserService
 import com.pashaoleynik97.droiddeploy.rest.model.user.CreateUserRequestDto
 import com.pashaoleynik97.droiddeploy.rest.model.user.UpdatePasswordRequestDto
+import com.pashaoleynik97.droiddeploy.rest.model.user.UpdateUserActiveStatusRequestDto
 import com.pashaoleynik97.droiddeploy.rest.model.user.UserResponseDto
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.PagedResponse
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
@@ -146,5 +147,25 @@ class UserController(
         return ResponseEntity
             .status(HttpStatus.OK)
             .body(RestResponse.success(Unit, "Password updated successfully"))
+    }
+
+    @PutMapping("/{userId}/activate")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun updateActiveStatus(
+        @PathVariable userId: UUID,
+        @RequestBody request: UpdateUserActiveStatusRequestDto,
+        @AuthenticationPrincipal authentication: JwtAuthentication
+    ): ResponseEntity<RestResponse<Unit>> {
+        logger.info { "PUT /api/v1/user/$userId/activate - Update active status to ${request.setActive} request from user: ${authentication.userId}" }
+
+        // Update active status (this will validate user exists, not self-modifying, not super admin)
+        userService.updateActiveStatus(userId, request.setActive, authentication.userId, userDefaultsProperties.superAdminLogin)
+
+        val statusText = if (request.setActive) "activated" else "deactivated"
+        logger.info { "User $userId $statusText successfully by user: ${authentication.userId}" }
+
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(RestResponse.success(Unit, "User $statusText successfully"))
     }
 }

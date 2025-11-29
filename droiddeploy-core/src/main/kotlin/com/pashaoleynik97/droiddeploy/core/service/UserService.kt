@@ -13,4 +13,5 @@ interface UserService {
     fun userExists(login: String): Boolean
     fun findAll(role: UserRole?, isActive: Boolean?, pageable: Pageable): Page<User>
     fun updatePassword(userId: UUID, newPassword: String): User
+    fun updateActiveStatus(userId: UUID, setActive: Boolean, currentUserId: UUID, superAdminLogin: String): User
 }
