@@ -9,6 +9,8 @@ import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
 import com.pashaoleynik97.droiddeploy.core.service.UserService
 import mu.KotlinLogging
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import java.time.Instant
@@ -89,5 +91,12 @@ class UserServiceImpl(
     override fun userExists(login: String): Boolean {
         logger.debug { "Checking if user exists with login: $login" }
         return userRepository.existsByLogin(login)
+    }
+
+    override fun findAll(role: UserRole?, isActive: Boolean?, pageable: Pageable): Page<User> {
+        logger.debug { "Finding users with filters: role=$role, isActive=$isActive, page=${pageable.pageNumber}, size=${pageable.pageSize}" }
+        val users = userRepository.findAll(role, isActive, pageable)
+        logger.info { "Found ${users.totalElements} users matching filters" }
+        return users
     }
 }

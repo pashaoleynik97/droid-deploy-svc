@@ -6,15 +6,18 @@ import com.pashaoleynik97.droiddeploy.core.exception.UserNotFoundException
 import com.pashaoleynik97.droiddeploy.core.service.UserService
 import com.pashaoleynik97.droiddeploy.rest.model.user.CreateUserRequestDto
 import com.pashaoleynik97.droiddeploy.rest.model.user.UserResponseDto
+import com.pashaoleynik97.droiddeploy.rest.model.wrapper.PagedResponse
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
 import com.pashaoleynik97.droiddeploy.rest.security.JwtAuthentication
 import mu.KotlinLogging
+import org.springframework.data.domain.PageRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import java.util.UUID
+import kotlin.math.min
 
 private val logger = KotlinLogging.logger {}
 
@@ -23,6 +26,46 @@ private val logger = KotlinLogging.logger {}
 class UserController(
     private val userService: UserService
 ) {
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    fun listUsers(
+        @RequestParam(required = false) role: String?,
+        @RequestParam(required = false) isActive: Boolean?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int
+    ): ResponseEntity<RestResponse<PagedResponse<UserResponseDto>>> {
+        logger.info { "GET /api/v1/user - List users request with filters: role=$role, isActive=$isActive, page=$page, size=$size" }
+
+        // Validate and convert role parameter
+        val roleFilter = role?.let {
+            try {
+                UserRole.valueOf(it.uppercase())
+            } catch (_: IllegalArgumentException) {
+                logger.warn { "Invalid role filter provided: $role" }
+                throw IllegalArgumentException("Invalid role: $role. Allowed values: ADMIN, CI, CONSUMER")
+            }
+        }
+
+        // Validate page size (max 100)
+        val validatedSize = min(size, 100)
+        if (size > 100) {
+            logger.warn { "Requested page size $size exceeds maximum of 100, using 100" }
+        }
+
+        // Create pageable
+        val pageable = PageRequest.of(page, validatedSize)
+
+        // Fetch users
+        val usersPage = userService.findAll(roleFilter, isActive, pageable)
+        val pagedResponse = PagedResponse.from(usersPage, UserResponseDto::fromDomain)
+
+        logger.info { "Retrieved ${pagedResponse.totalElements} users, returning page ${pagedResponse.page} of ${pagedResponse.totalPages}" }
+
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(RestResponse.success(pagedResponse, "Users retrieved successfully"))
+    }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")

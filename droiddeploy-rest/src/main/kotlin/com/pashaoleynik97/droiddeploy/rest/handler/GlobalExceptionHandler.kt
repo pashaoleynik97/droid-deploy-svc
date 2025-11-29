@@ -16,6 +16,7 @@ import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
@@ -162,6 +163,34 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.FORBIDDEN)
             .body(RestResponse.failure(error, "Access denied"))
+    }
+
+    @ExceptionHandler(AccessDeniedException::class)
+    fun handleAccessDenied(ex: AccessDeniedException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Access denied exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHORIZATION,
+            message = "Access denied: insufficient permissions"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
+            .body(RestResponse.failure(error, "Access denied"))
+    }
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgument(ex: IllegalArgumentException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Illegal argument exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Invalid parameter"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Validation failed"))
     }
 
     @ExceptionHandler(DroidDeployException::class)
