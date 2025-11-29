@@ -9,4 +9,5 @@ import java.util.UUID
 interface JpaUserRepository : JpaRepository<UserEntity, UUID> {
     fun findByLogin(login: String): UserEntity?
     fun existsByLogin(login: String): Boolean
+    fun existsByLoginIgnoreCase(login: String): Boolean
 }

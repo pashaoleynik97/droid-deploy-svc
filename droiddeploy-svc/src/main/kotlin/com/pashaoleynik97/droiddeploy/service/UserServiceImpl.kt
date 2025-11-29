@@ -2,6 +2,10 @@ package com.pashaoleynik97.droiddeploy.service
 
 import com.pashaoleynik97.droiddeploy.core.domain.User
 import com.pashaoleynik97.droiddeploy.core.domain.UserRole
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidLoginFormatException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
+import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
 import com.pashaoleynik97.droiddeploy.core.service.UserService
 import mu.KotlinLogging
@@ -21,9 +25,30 @@ class UserServiceImpl(
     override fun createUser(login: String, password: String, role: UserRole): User {
         logger.debug { "Attempting to create user with login: $login, role: $role" }
 
-        if (userRepository.existsByLogin(login)) {
-            logger.warn { "Failed to create user: login '$login' already exists" }
-            throw IllegalArgumentException("User with login '$login' already exists")
+        // Validate role - CONSUMER not allowed via this method
+        if (role == UserRole.CONSUMER) {
+            logger.warn { "Failed to create user: CONSUMER role not allowed" }
+            throw InvalidRoleException("CONSUMER role cannot be created via this endpoint. CONSUMER users are created with applications.")
+        }
+
+        // Validate login format (3-20 chars, alphanumeric + underscore/dash)
+        val loginPattern = Regex("^[a-zA-Z0-9_-]{3,20}$")
+        if (!login.matches(loginPattern)) {
+            logger.warn { "Failed to create user: invalid login format: $login" }
+            throw InvalidLoginFormatException()
+        }
+
+        // Validate login uniqueness (case-insensitive)
+        if (userRepository.existsByLoginIgnoreCase(login)) {
+            logger.warn { "Failed to create user: login '$login' already exists (case-insensitive check)" }
+            throw LoginAlreadyExistsException(login)
+        }
+
+        // Validate password strength (min 10 chars, must contain uppercase, lowercase, digit)
+        val passwordPattern = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{10,}$")
+        if (!password.matches(passwordPattern)) {
+            logger.warn { "Failed to create user: password doesn't meet security requirements" }
+            throw InvalidPasswordException()
         }
 
         val now = Instant.now()

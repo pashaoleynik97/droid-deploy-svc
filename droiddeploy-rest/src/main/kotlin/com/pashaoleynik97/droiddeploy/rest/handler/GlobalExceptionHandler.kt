@@ -2,7 +2,11 @@ package com.pashaoleynik97.droiddeploy.rest.handler
 
 import com.pashaoleynik97.droiddeploy.core.exception.DroidDeployException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidCredentialsException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidLoginFormatException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
+import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestError
@@ -72,6 +76,62 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.FORBIDDEN)
             .body(RestResponse.failure(error, "Access denied"))
+    }
+
+    @ExceptionHandler(LoginAlreadyExistsException::class)
+    fun handleLoginAlreadyExists(ex: LoginAlreadyExistsException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Login already exists exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Login already exists"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "User creation failed"))
+    }
+
+    @ExceptionHandler(InvalidPasswordException::class)
+    fun handleInvalidPassword(ex: InvalidPasswordException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid password exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Password doesn't meet security requirements"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "User creation failed"))
+    }
+
+    @ExceptionHandler(InvalidRoleException::class)
+    fun handleInvalidRole(ex: InvalidRoleException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid role exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Invalid role"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "User creation failed"))
+    }
+
+    @ExceptionHandler(InvalidLoginFormatException::class)
+    fun handleInvalidLoginFormat(ex: InvalidLoginFormatException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid login format exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Invalid login format"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "User creation failed"))
     }
 
     @ExceptionHandler(DroidDeployException::class)

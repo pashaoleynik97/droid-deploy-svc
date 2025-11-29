@@ -15,7 +15,7 @@ class ApplicationStartupTest : AbstractIntegrationTest() {
     @Test
     fun `should create super admin user on startup`() {
         // Given
-        val expectedLogin = "test_admin"
+        val expectedLogin = "super_admin_test"  // From application-test.yaml
 
         // When
         val superAdmin = userService.findByLogin(expectedLogin)
@@ -31,7 +31,7 @@ class ApplicationStartupTest : AbstractIntegrationTest() {
     @Test
     fun `should not create duplicate super admin on multiple startups`() {
         // Given
-        val expectedLogin = "test_admin"
+        val expectedLogin = "super_admin_test"  // From application-test.yaml
 
         // When - find the user that was created on startup
         val superAdmin = userService.findByLogin(expectedLogin)

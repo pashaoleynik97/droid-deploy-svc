@@ -8,4 +8,5 @@ interface UserRepository {
     fun findById(id: UUID): User?
     fun save(user: User): User
     fun existsByLogin(login: String): Boolean
+    fun existsByLoginIgnoreCase(login: String): Boolean
 }

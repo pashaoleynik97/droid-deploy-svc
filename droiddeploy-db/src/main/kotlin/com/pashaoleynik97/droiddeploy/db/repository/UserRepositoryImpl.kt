@@ -37,4 +37,9 @@ class UserRepositoryImpl(
         logger.trace { "Checking existence of user with login: $login" }
         return jpaUserRepository.existsByLogin(login)
     }
+
+    override fun existsByLoginIgnoreCase(login: String): Boolean {
+        logger.trace { "Checking existence of user with login (case-insensitive): $login" }
+        return jpaUserRepository.existsByLoginIgnoreCase(login)
+    }
 }
