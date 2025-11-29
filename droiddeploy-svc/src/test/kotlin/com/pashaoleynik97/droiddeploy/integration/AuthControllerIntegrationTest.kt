@@ -28,10 +28,10 @@ class AuthControllerIntegrationTest : AbstractIntegrationTest() {
     @Autowired
     private lateinit var userService: UserService
 
-    @Value("\${security.jwt.secret}")
+    @Value($$"${security.jwt.secret}")
     private lateinit var jwtSecret: String
 
-    @Value("\${security.jwt.issuer}")
+    @Value($$"${security.jwt.issuer}")
     private lateinit var jwtIssuer: String
 
     private lateinit var testAdminLogin: String
