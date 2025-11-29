@@ -1,10 +1,12 @@
 package com.pashaoleynik97.droiddeploy.integration
 
 import com.pashaoleynik97.droiddeploy.AbstractIntegrationTest
+import com.pashaoleynik97.droiddeploy.core.domain.User
 import com.pashaoleynik97.droiddeploy.core.domain.UserRole
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidCredentialsException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
+import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
 import com.pashaoleynik97.droiddeploy.core.service.UserService
 import com.pashaoleynik97.droiddeploy.rest.model.auth.LoginRequestDto
 import com.pashaoleynik97.droiddeploy.rest.model.auth.RefreshTokenRequestDto
@@ -18,7 +20,9 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.security.crypto.password.PasswordEncoder
 import java.time.Instant
+import java.util.UUID
 
 class AuthControllerIntegrationTest : AbstractIntegrationTest() {
 
@@ -27,6 +31,12 @@ class AuthControllerIntegrationTest : AbstractIntegrationTest() {
 
     @Autowired
     private lateinit var userService: UserService
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var passwordEncoder: PasswordEncoder
 
     @Value($$"${security.jwt.secret}")
     private lateinit var jwtSecret: String
@@ -39,7 +49,7 @@ class AuthControllerIntegrationTest : AbstractIntegrationTest() {
 
     @BeforeEach
     fun setUp() {
-        testAdminLogin = "integration_test_admin"
+        testAdminLogin = "test_admin"
         testAdminPassword = "TestPassword123!@#"
 
         // Create a test ADMIN user if it doesn't exist
@@ -123,7 +133,7 @@ class AuthControllerIntegrationTest : AbstractIntegrationTest() {
     fun `login should throw InvalidCredentialsException for non-existent user`() {
         // Given
         val loginRequest = LoginRequestDto(
-            login = "nonexistent_user_12345",
+            login = "nonexistent_usr",  // Max 20 chars
             password = "SomePassword123"
         )
 
@@ -135,8 +145,8 @@ class AuthControllerIntegrationTest : AbstractIntegrationTest() {
 
     @Test
     fun `login should throw UnauthorizedAccessException for non-ADMIN user (CI)`() {
-        // Given - Create a CI user
-        val ciUserLogin = "integration_test_ci_user"
+        // Given - Create a CI user (login must be max 20 chars)
+        val ciUserLogin = "test_ci_user"
         val ciUserPassword = "CiPassword123"
         if (!userService.userExists(ciUserLogin)) {
             userService.createUser(ciUserLogin, ciUserPassword, UserRole.CI)
@@ -156,11 +166,25 @@ class AuthControllerIntegrationTest : AbstractIntegrationTest() {
 
     @Test
     fun `login should throw UnauthorizedAccessException for non-ADMIN user (CONSUMER)`() {
-        // Given - Create a CONSUMER user
-        val consumerLogin = "integration_test_consumer"
-        val consumerPassword = "ConsumerPassword123"
+        // Given - Create a CONSUMER user directly via repository (bypassing service validation)
+        val consumerLogin = "test_consumer"
+        val consumerPassword = "ConsumerPass123"
         if (!userService.userExists(consumerLogin)) {
-            userService.createUser(consumerLogin, consumerPassword, UserRole.CONSUMER)
+            // Create CONSUMER user directly via repository since createUser() rejects CONSUMER role
+            val now = Instant.now()
+            val consumerUser = User(
+                id = UUID.randomUUID(),
+                login = consumerLogin,
+                passwordHash = passwordEncoder.encode(consumerPassword),
+                role = UserRole.CONSUMER,
+                isActive = true,
+                createdAt = now,
+                updatedAt = now,
+                lastLoginAt = null,
+                lastInteractionAt = null,
+                tokenVersion = 0
+            )
+            userRepository.save(consumerUser)
         }
 
         val loginRequest = LoginRequestDto(

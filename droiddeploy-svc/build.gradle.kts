@@ -20,6 +20,8 @@ dependencies {
 
     // JWT
     implementation("io.jsonwebtoken:jjwt-api:0.12.5")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
 
@@ -32,6 +34,7 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
     testImplementation("org.testcontainers:testcontainers:1.19.3")
     testImplementation("org.testcontainers:postgresql:1.19.3")

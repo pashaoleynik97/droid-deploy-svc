@@ -65,6 +65,38 @@ class JwtTokenProvider(
     }
 
     /**
+     * Generate an access token for testing purposes
+     */
+    fun createAccessToken(userId: UUID, role: com.pashaoleynik97.droiddeploy.core.domain.UserRole, tokenVersion: Int): String {
+        val now = Instant.now()
+        val expiresAt = now.plusSeconds(jwtProperties.accessTokenValiditySeconds)
+        return generateToken(
+            subject = "user:$userId",
+            role = role.name,
+            tokenType = "access",
+            tokenVersion = tokenVersion,
+            issuedAt = now,
+            expiresAt = expiresAt
+        )
+    }
+
+    /**
+     * Generate a refresh token for testing purposes
+     */
+    fun createRefreshToken(userId: UUID, role: com.pashaoleynik97.droiddeploy.core.domain.UserRole, tokenVersion: Int): String {
+        val now = Instant.now()
+        val expiresAt = now.plusSeconds(jwtProperties.refreshTokenValiditySeconds)
+        return generateToken(
+            subject = "user:$userId",
+            role = role.name,
+            tokenType = "refresh",
+            tokenVersion = tokenVersion,
+            issuedAt = now,
+            expiresAt = expiresAt
+        )
+    }
+
+    /**
      * Generate a JWT token with the given parameters
      */
     private fun generateToken(

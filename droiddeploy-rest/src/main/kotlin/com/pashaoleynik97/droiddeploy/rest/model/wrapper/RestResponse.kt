@@ -5,6 +5,11 @@ data class RestResponse<T> (
     val message: String,
     val errors: List<RestError>
 ) {
+
+    @Suppress("unused")
+    val success: Boolean
+        get() = errors.isEmpty()
+
     companion object {
         fun <T> success(data: T?, message: String = "Success"): RestResponse<T> {
             return RestResponse(data, message, emptyList())

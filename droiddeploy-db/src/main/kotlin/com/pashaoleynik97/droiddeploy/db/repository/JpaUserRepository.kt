@@ -2,11 +2,13 @@ package com.pashaoleynik97.droiddeploy.db.repository
 
 import com.pashaoleynik97.droiddeploy.db.entity.UserEntity
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor
 import org.springframework.stereotype.Repository
 import java.util.UUID
 
 @Repository
-interface JpaUserRepository : JpaRepository<UserEntity, UUID> {
+interface JpaUserRepository : JpaRepository<UserEntity, UUID>, JpaSpecificationExecutor<UserEntity> {
     fun findByLogin(login: String): UserEntity?
     fun existsByLogin(login: String): Boolean
+    fun existsByLoginIgnoreCase(login: String): Boolean
 }

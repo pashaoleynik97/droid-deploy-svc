@@ -1,15 +1,25 @@
 package com.pashaoleynik97.droiddeploy.rest.handler
 
 import com.pashaoleynik97.droiddeploy.core.exception.DroidDeployException
+import com.pashaoleynik97.droiddeploy.core.exception.ForbiddenAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidCredentialsException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidLoginFormatException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidUserTypeException
+import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
+import com.pashaoleynik97.droiddeploy.core.exception.SelfModificationNotAllowedException
+import com.pashaoleynik97.droiddeploy.core.exception.SuperAdminProtectionException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
+import com.pashaoleynik97.droiddeploy.core.exception.UserNotFoundException
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestError
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
@@ -72,6 +82,160 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.FORBIDDEN)
             .body(RestResponse.failure(error, "Access denied"))
+    }
+
+    @ExceptionHandler(LoginAlreadyExistsException::class)
+    fun handleLoginAlreadyExists(ex: LoginAlreadyExistsException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Login already exists exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Login already exists"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "User creation failed"))
+    }
+
+    @ExceptionHandler(InvalidPasswordException::class)
+    fun handleInvalidPassword(ex: InvalidPasswordException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid password exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Password doesn't meet security requirements"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "User creation failed"))
+    }
+
+    @ExceptionHandler(InvalidRoleException::class)
+    fun handleInvalidRole(ex: InvalidRoleException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid role exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Invalid role"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "User creation failed"))
+    }
+
+    @ExceptionHandler(InvalidLoginFormatException::class)
+    fun handleInvalidLoginFormat(ex: InvalidLoginFormatException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid login format exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Invalid login format"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "User creation failed"))
+    }
+
+    @ExceptionHandler(InvalidUserTypeException::class)
+    fun handleInvalidUserType(ex: InvalidUserTypeException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid user type exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Invalid user type for this operation"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Operation failed"))
+    }
+
+    @ExceptionHandler(SelfModificationNotAllowedException::class)
+    fun handleSelfModificationNotAllowed(ex: SelfModificationNotAllowedException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Self modification not allowed exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHORIZATION,
+            message = ex.message ?: "You cannot modify your own account"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
+            .body(RestResponse.failure(error, "Operation failed"))
+    }
+
+    @ExceptionHandler(SuperAdminProtectionException::class)
+    fun handleSuperAdminProtection(ex: SuperAdminProtectionException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Super admin protection exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHORIZATION,
+            message = ex.message ?: "Super admin account cannot be modified"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
+            .body(RestResponse.failure(error, "Operation failed"))
+    }
+
+    @ExceptionHandler(UserNotFoundException::class)
+    fun handleUserNotFound(ex: UserNotFoundException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "User not found exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.NOT_FOUND,
+            message = ex.message ?: "User not found"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(RestResponse.failure(error, "User not found"))
+    }
+
+    @ExceptionHandler(ForbiddenAccessException::class)
+    fun handleForbiddenAccess(ex: ForbiddenAccessException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Forbidden access exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHORIZATION,
+            message = ex.message ?: "Access denied"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
+            .body(RestResponse.failure(error, "Access denied"))
+    }
+
+    @ExceptionHandler(AccessDeniedException::class)
+    fun handleAccessDenied(ex: AccessDeniedException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Access denied exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHORIZATION,
+            message = "Access denied: insufficient permissions"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
+            .body(RestResponse.failure(error, "Access denied"))
+    }
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgument(ex: IllegalArgumentException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Illegal argument exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Invalid parameter"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Validation failed"))
     }
 
     @ExceptionHandler(DroidDeployException::class)
