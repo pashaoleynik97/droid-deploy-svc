@@ -1,0 +1,11 @@
+package com.pashaoleynik97.droiddeploy.core.repository
+
+import com.pashaoleynik97.droiddeploy.core.domain.Application
+import java.util.UUID
+
+interface ApplicationRepository {
+    fun save(application: Application): Application
+    fun findById(id: UUID): Application?
+    fun findByBundleId(bundleId: String): Application?
+    fun existsByBundleId(bundleId: String): Boolean
+}

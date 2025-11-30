@@ -1,7 +1,10 @@
 package com.pashaoleynik97.droiddeploy.rest.handler
 
+import com.pashaoleynik97.droiddeploy.core.exception.BundleIdAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.DroidDeployException
 import com.pashaoleynik97.droiddeploy.core.exception.ForbiddenAccessException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidApplicationNameException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidBundleIdException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidCredentialsException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidLoginFormatException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
@@ -222,6 +225,48 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.FORBIDDEN)
             .body(RestResponse.failure(error, "Access denied"))
+    }
+
+    @ExceptionHandler(InvalidApplicationNameException::class)
+    fun handleInvalidApplicationName(ex: InvalidApplicationNameException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid application name exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Application name is invalid"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Application creation failed"))
+    }
+
+    @ExceptionHandler(InvalidBundleIdException::class)
+    fun handleInvalidBundleId(ex: InvalidBundleIdException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid bundle id exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Bundle id is invalid"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Application creation failed"))
+    }
+
+    @ExceptionHandler(BundleIdAlreadyExistsException::class)
+    fun handleBundleIdAlreadyExists(ex: BundleIdAlreadyExistsException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Bundle id already exists exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Application with this bundle id already exists"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Application creation failed"))
     }
 
     @ExceptionHandler(IllegalArgumentException::class)
