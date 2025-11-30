@@ -4,6 +4,8 @@ import com.pashaoleynik97.droiddeploy.core.domain.Application
 import com.pashaoleynik97.droiddeploy.core.repository.ApplicationRepository
 import com.pashaoleynik97.droiddeploy.db.entity.ApplicationEntity
 import mu.KotlinLogging
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Component
 import java.util.UUID
@@ -42,5 +44,12 @@ class ApplicationRepositoryImpl(
     override fun hasVersions(applicationId: UUID): Boolean {
         logger.trace { "Checking if application has versions: $applicationId" }
         return jpaApplicationVersionRepository.existsByApplicationId(applicationId)
+    }
+
+    override fun findAll(pageable: Pageable): Page<Application> {
+        logger.debug { "Querying database for applications: page=${pageable.pageNumber}, size=${pageable.pageSize}" }
+        val result = jpaApplicationRepository.findAll(pageable)
+        logger.trace { "Found ${result.totalElements} applications" }
+        return result.map(ApplicationEntity::toDomain)
     }
 }

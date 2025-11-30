@@ -10,6 +10,8 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidBundleIdException
 import com.pashaoleynik97.droiddeploy.core.repository.ApplicationRepository
 import com.pashaoleynik97.droiddeploy.core.service.ApplicationService
 import mu.KotlinLogging
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
@@ -138,5 +140,12 @@ class ApplicationServiceImpl(
         val savedApplication = applicationRepository.save(updatedApplication)
         logger.info { "Application updated successfully: id=${savedApplication.id}, name=${savedApplication.name}, bundleId=${savedApplication.bundleId}" }
         return savedApplication
+    }
+
+    override fun listApplications(pageable: Pageable): Page<Application> {
+        logger.debug { "Listing applications: page=${pageable.pageNumber}, size=${pageable.pageSize}" }
+        val applications = applicationRepository.findAll(pageable)
+        logger.info { "Retrieved ${applications.totalElements} applications, returning page ${applications.number} of ${applications.totalPages}" }
+        return applications
     }
 }

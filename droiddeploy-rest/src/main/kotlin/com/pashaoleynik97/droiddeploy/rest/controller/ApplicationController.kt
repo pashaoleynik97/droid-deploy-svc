@@ -4,13 +4,17 @@ import com.pashaoleynik97.droiddeploy.core.dto.application.ApplicationResponseDt
 import com.pashaoleynik97.droiddeploy.core.dto.application.CreateApplicationRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.UpdateApplicationRequestDto
 import com.pashaoleynik97.droiddeploy.core.service.ApplicationService
+import com.pashaoleynik97.droiddeploy.rest.model.wrapper.PagedResponse
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
 import mu.KotlinLogging
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
 import java.util.UUID
+import kotlin.math.min
 
 private val logger = KotlinLogging.logger {}
 
@@ -19,6 +23,34 @@ private val logger = KotlinLogging.logger {}
 class ApplicationController(
     private val applicationService: ApplicationService
 ) {
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    fun listApplications(
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int
+    ): ResponseEntity<RestResponse<PagedResponse<ApplicationResponseDto>>> {
+        logger.info { "GET /api/v1/application - List applications request: page=$page, size=$size" }
+
+        // Validate page size (max 100)
+        val validatedSize = min(size, 100)
+        if (size > 100) {
+            logger.warn { "Requested page size $size exceeds maximum of 100, using 100" }
+        }
+
+        // Create pageable with sort by createdAt descending
+        val pageable = PageRequest.of(page, validatedSize, Sort.by(Sort.Direction.DESC, "createdAt"))
+
+        // Fetch applications
+        val applicationsPage = applicationService.listApplications(pageable)
+        val pagedResponse = PagedResponse.from(applicationsPage, ApplicationResponseDto::fromDomain)
+
+        logger.info { "Retrieved ${pagedResponse.totalElements} applications, returning page ${pagedResponse.page} of ${pagedResponse.totalPages}" }
+
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(RestResponse.success(pagedResponse, "Applications retrieved successfully"))
+    }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
