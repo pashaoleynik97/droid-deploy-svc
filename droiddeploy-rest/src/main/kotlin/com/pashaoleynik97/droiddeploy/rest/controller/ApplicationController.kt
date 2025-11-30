@@ -52,6 +52,22 @@ class ApplicationController(
             .body(RestResponse.success(pagedResponse, "Applications retrieved successfully"))
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun getApplicationById(
+        @PathVariable id: UUID
+    ): ResponseEntity<RestResponse<ApplicationResponseDto>> {
+        logger.info { "GET /api/v1/application/{id} - Get application by ID: id=$id" }
+
+        val application = applicationService.getApplicationById(id)
+
+        logger.info { "Application retrieved successfully: id=${application.id}, bundleId=${application.bundleId}" }
+
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(RestResponse.success(application, "Application retrieved successfully"))
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     fun createApplication(

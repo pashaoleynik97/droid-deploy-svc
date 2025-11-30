@@ -1,6 +1,7 @@
 package com.pashaoleynik97.droiddeploy.service.application
 
 import com.pashaoleynik97.droiddeploy.core.domain.Application
+import com.pashaoleynik97.droiddeploy.core.dto.application.ApplicationResponseDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.CreateApplicationRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.UpdateApplicationRequestDto
 import com.pashaoleynik97.droiddeploy.core.exception.ApplicationNotFoundException
@@ -147,5 +148,15 @@ class ApplicationServiceImpl(
         val applications = applicationRepository.findAll(pageable)
         logger.info { "Retrieved ${applications.totalElements} applications, returning page ${applications.number} of ${applications.totalPages}" }
         return applications
+    }
+
+    override fun getApplicationById(id: UUID): ApplicationResponseDto {
+        logger.debug { "Attempting to get application by id: $id" }
+
+        val application = applicationRepository.findById(id)
+            ?: throw ApplicationNotFoundException(id)
+
+        logger.info { "Application found: id=${application.id}, name=${application.name}, bundleId=${application.bundleId}" }
+        return ApplicationResponseDto.fromDomain(application)
     }
 }
