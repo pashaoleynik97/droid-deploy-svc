@@ -7,8 +7,8 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenExceptio
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
-import com.pashaoleynik97.droiddeploy.rest.model.auth.LoginRequestDto
-import com.pashaoleynik97.droiddeploy.rest.model.auth.RefreshTokenRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.auth.LoginRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.auth.RefreshTokenRequestDto
 import com.pashaoleynik97.droiddeploy.security.JwtTokenProvider
 import io.jsonwebtoken.Claims
 import org.junit.jupiter.api.Assertions.*

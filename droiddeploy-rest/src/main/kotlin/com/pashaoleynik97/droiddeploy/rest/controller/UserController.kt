@@ -5,10 +5,10 @@ import com.pashaoleynik97.droiddeploy.core.domain.UserRole
 import com.pashaoleynik97.droiddeploy.core.exception.ForbiddenAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotFoundException
 import com.pashaoleynik97.droiddeploy.core.service.UserService
-import com.pashaoleynik97.droiddeploy.rest.model.user.CreateUserRequestDto
-import com.pashaoleynik97.droiddeploy.rest.model.user.UpdatePasswordRequestDto
-import com.pashaoleynik97.droiddeploy.rest.model.user.UpdateUserActiveStatusRequestDto
-import com.pashaoleynik97.droiddeploy.rest.model.user.UserResponseDto
+import com.pashaoleynik97.droiddeploy.core.dto.user.CreateUserRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.user.UpdatePasswordRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.user.UpdateUserActiveStatusRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.user.UserResponseDto
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.PagedResponse
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
 import com.pashaoleynik97.droiddeploy.rest.security.JwtAuthentication

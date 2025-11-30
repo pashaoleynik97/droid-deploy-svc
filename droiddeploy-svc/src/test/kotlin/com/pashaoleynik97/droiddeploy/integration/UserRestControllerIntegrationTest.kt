@@ -109,7 +109,7 @@ class UserRestControllerIntegrationTest : AbstractIntegrationTest() {
             .andExpect(jsonPath("$.data.id").value(adminUser.id.toString()))
             .andExpect(jsonPath("$.data.login").value(adminUser.login))
             .andExpect(jsonPath("$.data.role").value("ADMIN"))
-            .andExpect(jsonPath("$.data.active").value(true))
+            .andExpect(jsonPath("$.data.isActive").value(true))
             .andExpect(jsonPath("$.data.passwordHash").doesNotExist())
     }
 
@@ -125,7 +125,7 @@ class UserRestControllerIntegrationTest : AbstractIntegrationTest() {
             .andExpect(jsonPath("$.data.id").value(ciUser.id.toString()))
             .andExpect(jsonPath("$.data.login").value(ciUser.login))
             .andExpect(jsonPath("$.data.role").value("CI"))
-            .andExpect(jsonPath("$.data.active").value(true))
+            .andExpect(jsonPath("$.data.isActive").value(true))
     }
 
     @Test
@@ -212,7 +212,7 @@ class UserRestControllerIntegrationTest : AbstractIntegrationTest() {
             .andExpect(jsonPath("$.data.id").exists())
             .andExpect(jsonPath("$.data.login").exists())
             .andExpect(jsonPath("$.data.role").exists())
-            .andExpect(jsonPath("$.data.active").exists())
+            .andExpect(jsonPath("$.data.isActive").exists())
             .andExpect(jsonPath("$.data.createdAt").exists())
             .andExpect(jsonPath("$.data.updatedAt").exists())
             .andExpect(jsonPath("$.data.passwordHash").doesNotExist())

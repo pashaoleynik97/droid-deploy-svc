@@ -1,4 +1,4 @@
-package com.pashaoleynik97.droiddeploy.rest.model.user
+package com.pashaoleynik97.droiddeploy.core.dto.user
 
 data class UpdateUserActiveStatusRequestDto(
     val setActive: Boolean

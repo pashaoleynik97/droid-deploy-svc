@@ -25,6 +25,9 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
 
+    // Jackson + Kotlin
+    api("tools.jackson.module:jackson-module-kotlin")
+
     // Database driver
     runtimeOnly("org.postgresql:postgresql")
 

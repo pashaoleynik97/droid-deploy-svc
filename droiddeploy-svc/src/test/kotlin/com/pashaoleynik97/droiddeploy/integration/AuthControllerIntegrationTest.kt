@@ -8,9 +8,9 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenExceptio
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
 import com.pashaoleynik97.droiddeploy.core.service.UserService
-import com.pashaoleynik97.droiddeploy.rest.model.auth.LoginRequestDto
-import com.pashaoleynik97.droiddeploy.rest.model.auth.RefreshTokenRequestDto
-import com.pashaoleynik97.droiddeploy.rest.service.AuthService
+import com.pashaoleynik97.droiddeploy.core.dto.auth.LoginRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.auth.RefreshTokenRequestDto
+import com.pashaoleynik97.droiddeploy.core.service.AuthService
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
