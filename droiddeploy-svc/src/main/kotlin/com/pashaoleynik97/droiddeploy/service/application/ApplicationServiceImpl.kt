@@ -1,19 +1,28 @@
 package com.pashaoleynik97.droiddeploy.service.application
 
 import com.pashaoleynik97.droiddeploy.core.domain.Application
+import com.pashaoleynik97.droiddeploy.core.domain.ApplicationVersion
 import com.pashaoleynik97.droiddeploy.core.dto.application.ApplicationResponseDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.CreateApplicationRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.UpdateApplicationRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.application.VersionDto
 import com.pashaoleynik97.droiddeploy.core.exception.ApplicationNotFoundException
+import com.pashaoleynik97.droiddeploy.core.exception.ApplicationVersionAlreadyExistsException
+import com.pashaoleynik97.droiddeploy.core.exception.ApkStorageException
 import com.pashaoleynik97.droiddeploy.core.exception.BundleIdAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidApplicationNameException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidBundleIdException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidVersionCodeException
+import com.pashaoleynik97.droiddeploy.core.exception.SigningCertificateMismatchException
 import com.pashaoleynik97.droiddeploy.core.repository.ApplicationRepository
 import com.pashaoleynik97.droiddeploy.core.service.ApplicationService
+import com.pashaoleynik97.droiddeploy.core.storage.ApkStorage
 import mu.KotlinLogging
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.io.ByteArrayInputStream
 import java.time.Instant
 import java.util.UUID
 
@@ -21,7 +30,9 @@ private val logger = KotlinLogging.logger {}
 
 @Service
 class ApplicationServiceImpl(
-    private val applicationRepository: ApplicationRepository
+    private val applicationRepository: ApplicationRepository,
+    private val apkMetadataExtractor: ApkMetadataExtractor,
+    private val apkStorage: ApkStorage
 ) : ApplicationService {
 
     companion object {
@@ -172,5 +183,119 @@ class ApplicationServiceImpl(
 
         logger.info { "Application deleted successfully: id=$id, name=${application.name}, bundleId=${application.bundleId}" }
         // TODO: Delete APK files from file storage (to be implemented later)
+    }
+
+    @Transactional
+    override fun uploadNewVersion(applicationId: UUID, apkContent: ByteArray): VersionDto {
+        logger.debug { "Attempting to upload new version for application: $applicationId" }
+
+        // 1. Load application by id
+        var application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Extract APK metadata
+        val metadata = try {
+            apkMetadataExtractor.extractMetadata(apkContent)
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to extract APK metadata for application $applicationId" }
+            throw IllegalArgumentException("Failed to parse APK file: ${e.message}", e)
+        }
+
+        logger.debug { "APK metadata extracted: versionCode=${metadata.versionCode}, versionName=${metadata.versionName}, certSha256=${metadata.signingCertificateSha256}" }
+
+        // 3. Enforce signing certificate rules
+        if (application.signingCertificateSha256 == null) {
+            // First upload - set the signing certificate
+            logger.info { "Setting signing certificate for application $applicationId: ${metadata.signingCertificateSha256}" }
+            application = application.copy(signingCertificateSha256 = metadata.signingCertificateSha256)
+            application = applicationRepository.save(application)
+        } else if (application.signingCertificateSha256 != metadata.signingCertificateSha256) {
+            // Certificate mismatch
+            logger.warn { "Signing certificate mismatch for application $applicationId. Expected: ${application.signingCertificateSha256}, Got: ${metadata.signingCertificateSha256}" }
+            throw SigningCertificateMismatchException(
+                applicationId = applicationId.toString(),
+                expectedSha256 = application.signingCertificateSha256!!,
+                actualSha256 = metadata.signingCertificateSha256
+            )
+        } else {
+            logger.debug { "Signing certificate matches: ${application.signingCertificateSha256}" }
+        }
+
+        // 4. Validate version code
+        // Check if version already exists
+        if (applicationRepository.versionExists(applicationId, metadata.versionCode)) {
+            logger.warn { "Version code ${metadata.versionCode} already exists for application $applicationId" }
+            throw ApplicationVersionAlreadyExistsException(
+                applicationId = applicationId.toString(),
+                versionCode = metadata.versionCode
+            )
+        }
+
+        // Check that version code is greater than existing max
+        val maxVersionCode = applicationRepository.findMaxVersionCode(applicationId)
+        if (maxVersionCode != null && metadata.versionCode <= maxVersionCode) {
+            logger.warn { "Version code ${metadata.versionCode} is not greater than max version code $maxVersionCode for application $applicationId" }
+            throw InvalidVersionCodeException(
+                versionCode = metadata.versionCode,
+                maxVersionCode = maxVersionCode
+            )
+        }
+
+        logger.debug { "Version code validation passed. Max existing: $maxVersionCode, new: ${metadata.versionCode}" }
+
+        // 5. Create new ApplicationVersion
+        val now = Instant.now()
+        val applicationVersion = ApplicationVersion(
+            id = UUID.randomUUID(),
+            application = application,
+            versionCode = metadata.versionCode,
+            versionName = metadata.versionName,
+            stable = false, // By default, newly uploaded versions are not stable
+            createdAt = now
+        )
+
+        // 6. Save APK file first (before DB persist)
+        var apkSaved = false
+        try {
+            logger.debug { "Saving APK file to storage: applicationId=$applicationId, versionCode=${metadata.versionCode}" }
+            apkStorage.saveApk(applicationId, metadata.versionCode.toLong(), ByteArrayInputStream(apkContent))
+            apkSaved = true
+            logger.debug { "APK file saved successfully" }
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to save APK file for application $applicationId, version ${metadata.versionCode}" }
+            throw ApkStorageException("Failed to save APK file: ${e.message}", e)
+        }
+
+        // 7. Persist ApplicationVersion to database
+        val savedVersion = try {
+            applicationRepository.saveVersion(applicationVersion)
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to persist application version to database. Rolling back APK file." }
+
+            // Compensation: attempt to delete the APK file we just saved
+            if (apkSaved) {
+                try {
+                    logger.warn { "Attempting to delete APK file after DB persist failure" }
+                    apkStorage.deleteApk(applicationId, metadata.versionCode.toLong())
+                    logger.info { "Successfully deleted APK file during compensation" }
+                } catch (deleteException: Exception) {
+                    logger.error(deleteException) { "Failed to delete APK file during compensation. Manual cleanup may be required." }
+                }
+            }
+
+            // Re-throw the original exception
+            throw e
+        }
+
+        logger.info { "Application version uploaded successfully: applicationId=$applicationId, versionCode=${savedVersion.versionCode}, versionName=${savedVersion.versionName}" }
+
+        // 8. Map to DTO and return
+        return VersionDto(
+            versionCode = savedVersion.versionCode.toLong(),
+            versionName = savedVersion.versionName,
+            stable = savedVersion.stable
+        )
     }
 }

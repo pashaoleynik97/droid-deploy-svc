@@ -1,8 +1,10 @@
 package com.pashaoleynik97.droiddeploy.db.repository
 
 import com.pashaoleynik97.droiddeploy.core.domain.Application
+import com.pashaoleynik97.droiddeploy.core.domain.ApplicationVersion
 import com.pashaoleynik97.droiddeploy.core.repository.ApplicationRepository
 import com.pashaoleynik97.droiddeploy.db.entity.ApplicationEntity
+import com.pashaoleynik97.droiddeploy.db.entity.ApplicationVersionEntity
 import mu.KotlinLogging
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -57,5 +59,25 @@ class ApplicationRepositoryImpl(
         logger.debug { "Deleting application from database: id=$id" }
         jpaApplicationRepository.deleteById(id)
         logger.trace { "Application deleted successfully: id=$id" }
+    }
+
+    override fun saveVersion(applicationVersion: ApplicationVersion): ApplicationVersion {
+        logger.debug { "Saving application version to database: versionCode=${applicationVersion.versionCode}, applicationId=${applicationVersion.application.id}" }
+        val applicationEntity = jpaApplicationRepository.findByIdOrNull(applicationVersion.application.id)
+            ?: throw IllegalStateException("Application not found: ${applicationVersion.application.id}")
+        val entity = ApplicationVersionEntity.fromDomain(applicationVersion, applicationEntity)
+        val saved = jpaApplicationVersionRepository.save(entity)
+        logger.trace { "Application version saved successfully: id=${saved.id}" }
+        return saved.toDomain()
+    }
+
+    override fun findMaxVersionCode(applicationId: UUID): Int? {
+        logger.trace { "Querying database for max version code: applicationId=$applicationId" }
+        return jpaApplicationVersionRepository.findMaxVersionCodeByApplicationId(applicationId)?.toInt()
+    }
+
+    override fun versionExists(applicationId: UUID, versionCode: Int): Boolean {
+        logger.trace { "Checking existence of version: applicationId=$applicationId, versionCode=$versionCode" }
+        return jpaApplicationVersionRepository.existsByApplicationIdAndVersionCode(applicationId, versionCode.toLong())
     }
 }

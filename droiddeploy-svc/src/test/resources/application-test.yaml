@@ -1,3 +1,7 @@
 user-defaults:
   super-admin-login: super_admin_test
   super-admin-password: SuperAdminPass1!
+
+droiddeploy:
+  storage:
+    root: ${java.io.tmpdir}/droiddeploy-test/apks

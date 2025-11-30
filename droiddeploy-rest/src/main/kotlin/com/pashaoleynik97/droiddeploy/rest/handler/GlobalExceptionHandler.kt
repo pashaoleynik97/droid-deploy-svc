@@ -1,6 +1,7 @@
 package com.pashaoleynik97.droiddeploy.rest.handler
 
 import com.pashaoleynik97.droiddeploy.core.exception.ApplicationNotFoundException
+import com.pashaoleynik97.droiddeploy.core.exception.ApplicationVersionAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.BundleIdAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.DroidDeployException
 import com.pashaoleynik97.droiddeploy.core.exception.ForbiddenAccessException
@@ -12,8 +13,10 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidUserTypeException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidVersionCodeException
 import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.SelfModificationNotAllowedException
+import com.pashaoleynik97.droiddeploy.core.exception.SigningCertificateMismatchException
 import com.pashaoleynik97.droiddeploy.core.exception.SuperAdminProtectionException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
@@ -282,6 +285,48 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
             .body(RestResponse.failure(error, "Application creation failed"))
+    }
+
+    @ExceptionHandler(SigningCertificateMismatchException::class)
+    fun handleSigningCertificateMismatch(ex: SigningCertificateMismatchException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Signing certificate mismatch exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Signing certificate does not match the expected certificate"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Version upload failed"))
+    }
+
+    @ExceptionHandler(ApplicationVersionAlreadyExistsException::class)
+    fun handleApplicationVersionAlreadyExists(ex: ApplicationVersionAlreadyExistsException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Application version already exists exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Application version already exists"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.CONFLICT)
+            .body(RestResponse.failure(error, "Version upload failed"))
+    }
+
+    @ExceptionHandler(InvalidVersionCodeException::class)
+    fun handleInvalidVersionCode(ex: InvalidVersionCodeException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid version code exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Version code must be greater than existing versions"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "Version upload failed"))
     }
 
     @ExceptionHandler(IllegalArgumentException::class)
