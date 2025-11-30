@@ -52,4 +52,10 @@ class ApplicationRepositoryImpl(
         logger.trace { "Found ${result.totalElements} applications" }
         return result.map(ApplicationEntity::toDomain)
     }
+
+    override fun deleteById(id: UUID) {
+        logger.debug { "Deleting application from database: id=$id" }
+        jpaApplicationRepository.deleteById(id)
+        logger.trace { "Application deleted successfully: id=$id" }
+    }
 }

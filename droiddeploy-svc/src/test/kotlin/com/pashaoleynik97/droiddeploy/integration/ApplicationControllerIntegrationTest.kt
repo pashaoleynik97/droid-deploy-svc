@@ -512,4 +512,81 @@ class ApplicationControllerIntegrationTest : AbstractIntegrationTest() {
         assertEquals("Updated Name Only", updatedApp.name)
         assertEquals("com.example.withversions2", updatedApp.bundleId)
     }
+
+    @Test
+    fun `deleteApplication should delete existing application`() {
+        // Given
+        val createRequest = CreateApplicationRequestDto(
+            name = "App To Delete",
+            bundleId = "com.example.todelete"
+        )
+        val createdApp = applicationService.createApplication(createRequest)
+
+        // Verify application exists
+        val foundBeforeDelete = applicationRepository.findById(createdApp.id)
+        assertNotNull(foundBeforeDelete)
+
+        // When
+        applicationService.deleteApplication(createdApp.id)
+
+        // Then
+        val foundAfterDelete = applicationRepository.findById(createdApp.id)
+        assertNull(foundAfterDelete)
+    }
+
+    @Test
+    fun `deleteApplication should delete application and its versions`() {
+        // Given
+        val createRequest = CreateApplicationRequestDto(
+            name = "App With Versions To Delete",
+            bundleId = "com.example.withversionstodelete"
+        )
+        val createdApp = applicationService.createApplication(createRequest)
+
+        // Create versions for this application
+        val applicationEntity = jpaApplicationRepository.findById(createdApp.id).orElseThrow()
+        val version1 = ApplicationVersionEntity(
+            id = UUID.randomUUID(),
+            application = applicationEntity,
+            versionName = "1.0.0",
+            versionCode = 1,
+            stable = true,
+            createdAt = Instant.now()
+        )
+        val version2 = ApplicationVersionEntity(
+            id = UUID.randomUUID(),
+            application = applicationEntity,
+            versionName = "2.0.0",
+            versionCode = 2,
+            stable = true,
+            createdAt = Instant.now()
+        )
+        jpaApplicationVersionRepository.save(version1)
+        jpaApplicationVersionRepository.save(version2)
+
+        // Verify application and versions exist
+        assertTrue(jpaApplicationRepository.existsById(createdApp.id))
+        assertTrue(jpaApplicationVersionRepository.existsById(version1.id))
+        assertTrue(jpaApplicationVersionRepository.existsById(version2.id))
+
+        // When
+        applicationService.deleteApplication(createdApp.id)
+
+        // Then - Application and versions should be deleted
+        assertFalse(jpaApplicationRepository.existsById(createdApp.id))
+        assertFalse(jpaApplicationVersionRepository.existsById(version1.id))
+        assertFalse(jpaApplicationVersionRepository.existsById(version2.id))
+    }
+
+    @Test
+    fun `deleteApplication should throw ApplicationNotFoundException when application not found`() {
+        // Given
+        val nonExistentId = UUID.randomUUID()
+
+        // When & Then
+        val exception = assertThrows<ApplicationNotFoundException> {
+            applicationService.deleteApplication(nonExistentId)
+        }
+        assertTrue(exception.message!!.contains(nonExistentId.toString()))
+    }
 }

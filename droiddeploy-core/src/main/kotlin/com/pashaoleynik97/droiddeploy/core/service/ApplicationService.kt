@@ -13,4 +13,5 @@ interface ApplicationService {
     fun updateApplication(id: UUID, request: UpdateApplicationRequestDto): Application
     fun listApplications(pageable: Pageable): Page<Application>
     fun getApplicationById(id: UUID): ApplicationResponseDto
+    fun deleteApplication(id: UUID)
 }

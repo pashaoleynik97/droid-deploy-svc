@@ -102,4 +102,20 @@ class ApplicationController(
             .status(HttpStatus.OK)
             .body(RestResponse.success(responseDto, "Application updated successfully"))
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun deleteApplication(
+        @PathVariable id: UUID
+    ): ResponseEntity<RestResponse<Unit>> {
+        logger.info { "DELETE /api/v1/application/{id} - Delete application request: id=$id" }
+
+        applicationService.deleteApplication(id)
+
+        logger.info { "Application deleted successfully: id=$id" }
+
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(RestResponse.success(Unit, "Application deleted successfully"))
+    }
 }

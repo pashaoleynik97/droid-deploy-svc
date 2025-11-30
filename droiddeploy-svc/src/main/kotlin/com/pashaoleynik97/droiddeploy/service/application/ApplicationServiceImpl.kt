@@ -159,4 +159,18 @@ class ApplicationServiceImpl(
         logger.info { "Application found: id=${application.id}, name=${application.name}, bundleId=${application.bundleId}" }
         return ApplicationResponseDto.fromDomain(application)
     }
+
+    override fun deleteApplication(id: UUID) {
+        logger.debug { "Attempting to delete application by id: $id" }
+
+        // Verify application exists
+        val application = applicationRepository.findById(id)
+            ?: throw ApplicationNotFoundException(id)
+
+        // Delete application (versions will be deleted by DB cascade)
+        applicationRepository.deleteById(id)
+
+        logger.info { "Application deleted successfully: id=$id, name=${application.name}, bundleId=${application.bundleId}" }
+        // TODO: Delete APK files from file storage (to be implemented later)
+    }
 }

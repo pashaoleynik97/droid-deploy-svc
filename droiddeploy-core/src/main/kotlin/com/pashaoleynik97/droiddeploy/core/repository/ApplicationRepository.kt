@@ -12,4 +12,5 @@ interface ApplicationRepository {
     fun existsByBundleId(bundleId: String): Boolean
     fun hasVersions(applicationId: UUID): Boolean
     fun findAll(pageable: Pageable): Page<Application>
+    fun deleteById(id: UUID)
 }
