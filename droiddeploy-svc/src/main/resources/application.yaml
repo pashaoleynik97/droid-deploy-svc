@@ -26,6 +26,10 @@ user-defaults:
   super-admin-login: ${SUPER_ADMIN_LOGIN:super_admin}
   super-admin-password: ${SUPER_ADMIN_PWD:DdSUadmPwd&^1_z}
 
+droiddeploy:
+  storage:
+    root: /var/lib/droiddeploy/apks
+
 security:
   jwt:
     secret: ${JWT_SECRET:change-me-in-real-env-this-should-be-at-least-256-bits-long}
