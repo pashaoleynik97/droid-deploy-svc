@@ -1,10 +1,10 @@
 package com.pashaoleynik97.droiddeploy.rest.controller
 
-import com.pashaoleynik97.droiddeploy.rest.model.auth.LoginRequestDto
-import com.pashaoleynik97.droiddeploy.rest.model.auth.RefreshTokenRequestDto
-import com.pashaoleynik97.droiddeploy.rest.model.auth.TokenPairDto
+import com.pashaoleynik97.droiddeploy.core.dto.auth.LoginRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.auth.RefreshTokenRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.auth.TokenPairDto
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
-import com.pashaoleynik97.droiddeploy.rest.service.AuthService
+import com.pashaoleynik97.droiddeploy.core.service.AuthService
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

@@ -1,4 +1,4 @@
-package com.pashaoleynik97.droiddeploy.service
+package com.pashaoleynik97.droiddeploy.service.user
 
 import com.pashaoleynik97.droiddeploy.core.domain.User
 import com.pashaoleynik97.droiddeploy.core.domain.UserRole
@@ -7,13 +7,18 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidPasswordException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRoleException
 import com.pashaoleynik97.droiddeploy.core.exception.LoginAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
-import com.pashaoleynik97.droiddeploy.service.user.UserServiceImpl
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.mockito.kotlin.*
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import org.springframework.security.crypto.password.PasswordEncoder
+import java.time.Instant
+import java.util.UUID
 
 class UserServiceImplTest {
 
@@ -46,12 +51,12 @@ class UserServiceImplTest {
         val result = userService.createUser(login, password, role)
 
         // Then
-        assertNotNull(result)
-        assertEquals(login, result.login)
-        assertEquals(encodedPassword, result.passwordHash)
-        assertEquals(role, result.role)
-        assertTrue(result.isActive)
-        assertEquals(0, result.tokenVersion)
+        Assertions.assertNotNull(result)
+        Assertions.assertEquals(login, result.login)
+        Assertions.assertEquals(encodedPassword, result.passwordHash)
+        Assertions.assertEquals(role, result.role)
+        Assertions.assertTrue(result.isActive)
+        Assertions.assertEquals(0, result.tokenVersion)
 
         verify(userRepository).existsByLoginIgnoreCase(login)
         verify(passwordEncoder).encode(password)
@@ -70,7 +75,7 @@ class UserServiceImplTest {
             userService.createUser(login, password, role)
         }
 
-        assertTrue(exception.message!!.contains("CONSUMER"))
+        Assertions.assertTrue(exception.message!!.contains("CONSUMER"))
         verify(userRepository, never()).existsByLoginIgnoreCase(any())
         verify(passwordEncoder, never()).encode(any())
         verify(userRepository, never()).save(any())
@@ -135,7 +140,7 @@ class UserServiceImplTest {
             userService.createUser(login, password, role)
         }
 
-        assertTrue(exception.message!!.contains(login))
+        Assertions.assertTrue(exception.message!!.contains(login))
         verify(userRepository).existsByLoginIgnoreCase(login)
         verify(passwordEncoder, never()).encode(any())
         verify(userRepository, never()).save(any())
@@ -230,9 +235,9 @@ class UserServiceImplTest {
         val result = userService.createUser(login, password, role)
 
         // Then
-        assertNotNull(result)
-        assertEquals(login, result.login)
-        assertEquals(UserRole.CI, result.role)
+        Assertions.assertNotNull(result)
+        Assertions.assertEquals(login, result.login)
+        Assertions.assertEquals(UserRole.CI, result.role)
     }
 
     @Test
@@ -247,8 +252,8 @@ class UserServiceImplTest {
         val result = userService.findByLogin(login)
 
         // Then
-        assertNotNull(result)
-        assertEquals(login, result?.login)
+        Assertions.assertNotNull(result)
+        Assertions.assertEquals(login, result?.login)
         verify(userRepository).findByLogin(login)
     }
 
@@ -263,7 +268,7 @@ class UserServiceImplTest {
         val result = userService.findByLogin(login)
 
         // Then
-        assertNull(result)
+        Assertions.assertNull(result)
         verify(userRepository).findByLogin(login)
     }
 
@@ -278,7 +283,7 @@ class UserServiceImplTest {
         val result = userService.userExists(login)
 
         // Then
-        assertTrue(result)
+        Assertions.assertTrue(result)
         verify(userRepository).existsByLogin(login)
     }
 
@@ -293,19 +298,19 @@ class UserServiceImplTest {
         val result = userService.userExists(login)
 
         // Then
-        assertFalse(result)
+        Assertions.assertFalse(result)
         verify(userRepository).existsByLogin(login)
     }
 
     @Suppress("SameParameterValue")
     private fun createTestUser(login: String) = User(
-        id = java.util.UUID.randomUUID(),
+        id = UUID.randomUUID(),
         login = login,
         passwordHash = "hashedPassword",
         role = UserRole.ADMIN,
         isActive = true,
-        createdAt = java.time.Instant.now(),
-        updatedAt = java.time.Instant.now(),
+        createdAt = Instant.now(),
+        updatedAt = Instant.now(),
         lastLoginAt = null,
         lastInteractionAt = null,
         tokenVersion = 0

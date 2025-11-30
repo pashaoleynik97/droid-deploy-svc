@@ -20,6 +20,9 @@ dependencies {
     // Kotlin logging
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
 
+    // Jackson + Kotlin
+    api("tools.jackson.module:jackson-module-kotlin")
+
     // Spring Web
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-security")

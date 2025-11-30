@@ -6,10 +6,10 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenExceptio
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
-import com.pashaoleynik97.droiddeploy.rest.model.auth.LoginRequestDto
-import com.pashaoleynik97.droiddeploy.rest.model.auth.RefreshTokenRequestDto
-import com.pashaoleynik97.droiddeploy.rest.model.auth.TokenPairDto
-import com.pashaoleynik97.droiddeploy.rest.service.AuthService
+import com.pashaoleynik97.droiddeploy.core.dto.auth.LoginRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.auth.RefreshTokenRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.auth.TokenPairDto
+import com.pashaoleynik97.droiddeploy.core.service.AuthService
 import com.pashaoleynik97.droiddeploy.security.JwtTokenProvider
 import mu.KotlinLogging
 import org.springframework.security.crypto.password.PasswordEncoder
