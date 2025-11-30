@@ -12,7 +12,8 @@ private val logger = KotlinLogging.logger {}
 
 @Component
 class ApplicationRepositoryImpl(
-    private val jpaApplicationRepository: JpaApplicationRepository
+    private val jpaApplicationRepository: JpaApplicationRepository,
+    private val jpaApplicationVersionRepository: JpaApplicationVersionRepository
 ) : ApplicationRepository {
 
     override fun save(application: Application): Application {
@@ -36,5 +37,10 @@ class ApplicationRepositoryImpl(
     override fun existsByBundleId(bundleId: String): Boolean {
         logger.trace { "Checking existence of application with bundleId: $bundleId" }
         return jpaApplicationRepository.existsByBundleId(bundleId)
+    }
+
+    override fun hasVersions(applicationId: UUID): Boolean {
+        logger.trace { "Checking if application has versions: $applicationId" }
+        return jpaApplicationVersionRepository.existsByApplicationId(applicationId)
     }
 }

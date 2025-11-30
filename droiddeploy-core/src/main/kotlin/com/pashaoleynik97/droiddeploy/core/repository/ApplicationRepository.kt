@@ -8,4 +8,5 @@ interface ApplicationRepository {
     fun findById(id: UUID): Application?
     fun findByBundleId(bundleId: String): Application?
     fun existsByBundleId(bundleId: String): Boolean
+    fun hasVersions(applicationId: UUID): Boolean
 }

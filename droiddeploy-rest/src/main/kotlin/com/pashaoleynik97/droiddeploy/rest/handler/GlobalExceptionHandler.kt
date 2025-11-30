@@ -1,5 +1,6 @@
 package com.pashaoleynik97.droiddeploy.rest.handler
 
+import com.pashaoleynik97.droiddeploy.core.exception.ApplicationNotFoundException
 import com.pashaoleynik97.droiddeploy.core.exception.BundleIdAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.DroidDeployException
 import com.pashaoleynik97.droiddeploy.core.exception.ForbiddenAccessException
@@ -197,6 +198,20 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.NOT_FOUND)
             .body(RestResponse.failure(error, "User not found"))
+    }
+
+    @ExceptionHandler(ApplicationNotFoundException::class)
+    fun handleApplicationNotFound(ex: ApplicationNotFoundException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Application not found exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.NOT_FOUND,
+            message = ex.message ?: "Application not found"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(RestResponse.failure(error, "Application not found"))
     }
 
     @ExceptionHandler(ForbiddenAccessException::class)
