@@ -25,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -378,6 +379,174 @@ class ApplicationVersionControllerIntegrationTest : AbstractIntegrationTest() {
             .andExpect(jsonPath("$.data.versionCode").value(15))
     }
 
+    @Test
+    fun `updateVersionStability should return 200 when ADMIN updates version to stable`() {
+        // Given
+        val application = createTestApplication("com.example.adminstable")
+        createExistingVersion(application.id, versionCode = 10)
+
+        val requestBody = """{"stable": true}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 10)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.versionCode").value(10))
+            .andExpect(jsonPath("$.data.stable").value(true))
+            .andExpect(jsonPath("$.message").value("Version stability updated successfully"))
+
+        // Verify in DB
+        val versionEntity = jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(application.id, 10)
+        assertTrue(versionEntity != null && versionEntity.stable)
+    }
+
+    @Test
+    fun `updateVersionStability should return 200 when CI updates version to stable`() {
+        // Given
+        val application = createTestApplication("com.example.cistable")
+        createExistingVersion(application.id, versionCode = 5)
+
+        val requestBody = """{"stable": true}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 5)
+                .header("Authorization", "Bearer $ciAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.versionCode").value(5))
+            .andExpect(jsonPath("$.data.stable").value(true))
+    }
+
+    @Test
+    fun `updateVersionStability should return 200 when updating version to unstable`() {
+        // Given
+        val application = createTestApplication("com.example.unstable")
+        createExistingVersionWithStability(application.id, versionCode = 7, stable = true)
+
+        val requestBody = """{"stable": false}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 7)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.versionCode").value(7))
+            .andExpect(jsonPath("$.data.stable").value(false))
+
+        // Verify in DB
+        val versionEntity = jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(application.id, 7)
+        assertTrue(versionEntity != null && !versionEntity.stable)
+    }
+
+    @Test
+    fun `updateVersionStability should return 403 when CONSUMER tries to update`() {
+        // Given
+        val application = createTestApplication("com.example.consumerdeniedstable")
+        createExistingVersion(application.id, versionCode = 3)
+
+        val requestBody = """{"stable": true}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 3)
+                .header("Authorization", "Bearer $consumerAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `updateVersionStability should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+        val requestBody = """{"stable": true}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", nonExistentApplicationId, 1)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `updateVersionStability should return 404 when version not found`() {
+        // Given
+        val application = createTestApplication("com.example.versionnotfound")
+        val requestBody = """{"stable": true}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 999)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `updateVersionStability should allow toggling stability back and forth`() {
+        // Given
+        val application = createTestApplication("com.example.toggle")
+        createExistingVersion(application.id, versionCode = 20)
+
+        // When - set to stable
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 20)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"stable": true}""")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.stable").value(true))
+
+        // Then - set back to unstable
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 20)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"stable": false}""")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.stable").value(false))
+
+        // And - set to stable again
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 20)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"stable": true}""")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.stable").value(true))
+    }
+
     // Helper methods
 
     private fun createTestApplication(bundleId: String): Application {
@@ -410,6 +579,19 @@ class ApplicationVersionControllerIntegrationTest : AbstractIntegrationTest() {
             versionName = "Version $versionCode",
             versionCode = versionCode.toLong(),
             stable = false,
+            createdAt = Instant.now()
+        )
+        jpaApplicationVersionRepository.save(versionEntity)
+    }
+
+    private fun createExistingVersionWithStability(applicationId: UUID, versionCode: Int, stable: Boolean) {
+        val applicationEntity = jpaApplicationRepository.findById(applicationId).orElseThrow()
+        val versionEntity = ApplicationVersionEntity(
+            id = UUID.randomUUID(),
+            application = applicationEntity,
+            versionName = "Version $versionCode",
+            versionCode = versionCode.toLong(),
+            stable = stable,
             createdAt = Instant.now()
         )
         jpaApplicationVersionRepository.save(versionEntity)

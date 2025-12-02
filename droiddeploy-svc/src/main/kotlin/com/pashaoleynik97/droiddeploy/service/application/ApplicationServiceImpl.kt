@@ -8,6 +8,7 @@ import com.pashaoleynik97.droiddeploy.core.dto.application.UpdateApplicationRequ
 import com.pashaoleynik97.droiddeploy.core.dto.application.VersionDto
 import com.pashaoleynik97.droiddeploy.core.exception.ApplicationNotFoundException
 import com.pashaoleynik97.droiddeploy.core.exception.ApplicationVersionAlreadyExistsException
+import com.pashaoleynik97.droiddeploy.core.exception.ApplicationVersionNotFoundException
 import com.pashaoleynik97.droiddeploy.core.exception.ApkStorageException
 import com.pashaoleynik97.droiddeploy.core.exception.BundleIdAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidApplicationNameException
@@ -292,6 +293,37 @@ class ApplicationServiceImpl(
         logger.info { "Application version uploaded successfully: applicationId=$applicationId, versionCode=${savedVersion.versionCode}, versionName=${savedVersion.versionName}" }
 
         // 8. Map to DTO and return
+        return VersionDto(
+            versionCode = savedVersion.versionCode.toLong(),
+            versionName = savedVersion.versionName,
+            stable = savedVersion.stable
+        )
+    }
+
+    override fun updateVersionStability(applicationId: UUID, versionCode: Long, stable: Boolean): VersionDto {
+        logger.debug { "Attempting to update version stability: applicationId=$applicationId, versionCode=$versionCode, stable=$stable" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Find the version
+        val version = applicationRepository.findVersion(applicationId, versionCode)
+            ?: throw ApplicationVersionNotFoundException(applicationId, versionCode)
+
+        logger.debug { "Version found: versionCode=${version.versionCode}, versionName=${version.versionName}, currentStability=${version.stable}" }
+
+        // 3. Update the version stability
+        val updatedVersion = version.copy(stable = stable)
+
+        // 4. Save the updated version
+        val savedVersion = applicationRepository.saveVersion(updatedVersion)
+
+        logger.info { "Version stability updated successfully: applicationId=$applicationId, versionCode=$versionCode, stable=$stable" }
+
+        // 5. Map to DTO and return
         return VersionDto(
             versionCode = savedVersion.versionCode.toLong(),
             versionName = savedVersion.versionName,

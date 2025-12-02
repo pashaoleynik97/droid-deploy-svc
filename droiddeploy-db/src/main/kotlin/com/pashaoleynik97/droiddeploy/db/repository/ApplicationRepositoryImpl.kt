@@ -80,4 +80,9 @@ class ApplicationRepositoryImpl(
         logger.trace { "Checking existence of version: applicationId=$applicationId, versionCode=$versionCode" }
         return jpaApplicationVersionRepository.existsByApplicationIdAndVersionCode(applicationId, versionCode.toLong())
     }
+
+    override fun findVersion(applicationId: UUID, versionCode: Long): ApplicationVersion? {
+        logger.trace { "Querying database for application version: applicationId=$applicationId, versionCode=$versionCode" }
+        return jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(applicationId, versionCode)?.toDomain()
+    }
 }

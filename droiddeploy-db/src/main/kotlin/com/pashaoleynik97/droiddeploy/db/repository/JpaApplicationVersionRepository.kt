@@ -15,4 +15,6 @@ interface JpaApplicationVersionRepository : JpaRepository<ApplicationVersionEnti
 
     @Query("SELECT MAX(v.versionCode) FROM ApplicationVersionEntity v WHERE v.application.id = :applicationId")
     fun findMaxVersionCodeByApplicationId(@Param("applicationId") applicationId: UUID): Long?
+
+    fun findByApplicationIdAndVersionCode(applicationId: UUID, versionCode: Long): ApplicationVersionEntity?
 }

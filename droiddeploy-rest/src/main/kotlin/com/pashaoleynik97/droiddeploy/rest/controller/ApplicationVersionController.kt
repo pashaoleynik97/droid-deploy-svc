@@ -1,5 +1,6 @@
 package com.pashaoleynik97.droiddeploy.rest.controller
 
+import com.pashaoleynik97.droiddeploy.core.dto.application.UpdateVersionStabilityRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.VersionDto
 import com.pashaoleynik97.droiddeploy.core.service.ApplicationService
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
@@ -42,5 +43,22 @@ class ApplicationVersionController(
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(RestResponse.success(versionDto, "Version uploaded successfully"))
+    }
+
+    @PutMapping("/{applicationId}/version/{versionCode}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CI')")
+    fun updateVersionStability(
+        @PathVariable applicationId: UUID,
+        @PathVariable versionCode: Long,
+        @RequestBody request: UpdateVersionStabilityRequestDto
+    ): ResponseEntity<RestResponse<VersionDto>> {
+        logger.info { "PUT /api/v1/application/{applicationId}/version/{versionCode} - Update version stability request: applicationId=$applicationId, versionCode=$versionCode, stable=${request.stable}" }
+
+        val versionDto = applicationService.updateVersionStability(applicationId, versionCode, request.stable)
+
+        logger.info { "Version stability updated successfully: applicationId=$applicationId, versionCode=$versionCode, stable=${versionDto.stable}" }
+
+        return ResponseEntity
+            .ok(RestResponse.success(versionDto, "Version stability updated successfully"))
     }
 }

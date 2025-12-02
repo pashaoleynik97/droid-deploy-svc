@@ -16,4 +16,5 @@ interface ApplicationService {
     fun getApplicationById(id: UUID): ApplicationResponseDto
     fun deleteApplication(id: UUID)
     fun uploadNewVersion(applicationId: UUID, apkContent: ByteArray): VersionDto
+    fun updateVersionStability(applicationId: UUID, versionCode: Long, stable: Boolean): VersionDto
 }
