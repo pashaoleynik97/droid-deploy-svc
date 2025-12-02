@@ -80,4 +80,37 @@ class ApplicationRepositoryImpl(
         logger.trace { "Checking existence of version: applicationId=$applicationId, versionCode=$versionCode" }
         return jpaApplicationVersionRepository.existsByApplicationIdAndVersionCode(applicationId, versionCode.toLong())
     }
+
+    override fun findVersion(applicationId: UUID, versionCode: Long): ApplicationVersion? {
+        logger.trace { "Querying database for application version: applicationId=$applicationId, versionCode=$versionCode" }
+        return jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(applicationId, versionCode)?.toDomain()
+    }
+
+    override fun findLatestVersion(applicationId: UUID): ApplicationVersion? {
+        logger.trace { "Querying database for latest version of application: applicationId=$applicationId" }
+        return jpaApplicationVersionRepository.findTopByApplicationIdOrderByVersionCodeDesc(applicationId)?.toDomain()
+    }
+
+    override fun deleteVersion(applicationId: UUID, versionCode: Long) {
+        logger.debug { "Deleting application version from database: applicationId=$applicationId, versionCode=$versionCode" }
+        jpaApplicationVersionRepository.deleteByApplicationIdAndVersionCode(applicationId, versionCode)
+        logger.trace { "Application version deleted successfully: applicationId=$applicationId, versionCode=$versionCode" }
+    }
+
+    override fun findAllVersions(applicationId: UUID): List<ApplicationVersion> {
+        logger.trace { "Querying database for all versions of application: applicationId=$applicationId" }
+        return jpaApplicationVersionRepository.findAllByApplicationId(applicationId).map { it.toDomain() }
+    }
+
+    override fun findAllVersions(applicationId: UUID, pageable: Pageable): Page<ApplicationVersion> {
+        logger.debug { "Querying database for versions of application: applicationId=$applicationId, page=${pageable.pageNumber}, size=${pageable.pageSize}" }
+        val result = jpaApplicationVersionRepository.findAllByApplicationId(applicationId, pageable)
+        logger.trace { "Found ${result.totalElements} versions for application: $applicationId" }
+        return result.map(ApplicationVersionEntity::toDomain)
+    }
+
+    override fun findAllVersionCodes(applicationId: UUID): List<Long> {
+        logger.trace { "Querying database for all version codes of application: applicationId=$applicationId" }
+        return jpaApplicationVersionRepository.findVersionCodesByApplicationId(applicationId)
+    }
 }

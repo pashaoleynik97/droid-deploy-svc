@@ -2,12 +2,14 @@ package com.pashaoleynik97.droiddeploy.service.application
 
 import com.pashaoleynik97.droiddeploy.core.domain.Application
 import com.pashaoleynik97.droiddeploy.core.domain.ApplicationVersion
+import com.pashaoleynik97.droiddeploy.core.dto.application.ApkStream
 import com.pashaoleynik97.droiddeploy.core.dto.application.ApplicationResponseDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.CreateApplicationRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.UpdateApplicationRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.VersionDto
 import com.pashaoleynik97.droiddeploy.core.exception.ApplicationNotFoundException
 import com.pashaoleynik97.droiddeploy.core.exception.ApplicationVersionAlreadyExistsException
+import com.pashaoleynik97.droiddeploy.core.exception.ApplicationVersionNotFoundException
 import com.pashaoleynik97.droiddeploy.core.exception.ApkStorageException
 import com.pashaoleynik97.droiddeploy.core.exception.BundleIdAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidApplicationNameException
@@ -171,6 +173,7 @@ class ApplicationServiceImpl(
         return ApplicationResponseDto.fromDomain(application)
     }
 
+    @Transactional
     override fun deleteApplication(id: UUID) {
         logger.debug { "Attempting to delete application by id: $id" }
 
@@ -178,11 +181,28 @@ class ApplicationServiceImpl(
         val application = applicationRepository.findById(id)
             ?: throw ApplicationNotFoundException(id)
 
+        logger.debug { "Application found: id=${application.id}, name=${application.name}, bundleId=${application.bundleId}" }
+
+        // Get all version codes for this application
+        val versionCodes = applicationRepository.findAllVersionCodes(id)
+        logger.debug { "Found ${versionCodes.size} version(s) to delete for application $id" }
+
+        // Delete APK files from storage for each version
+        for (versionCode in versionCodes) {
+            try {
+                logger.debug { "Deleting APK file: applicationId=$id, versionCode=$versionCode" }
+                apkStorage.deleteApk(id, versionCode.toLong())
+                logger.debug { "APK file deleted successfully: versionCode=$versionCode" }
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to delete APK file for applicationId=$id, versionCode=$versionCode. Continuing with next file." }
+                // Continue with next file deletion and database cleanup
+            }
+        }
+
         // Delete application (versions will be deleted by DB cascade)
         applicationRepository.deleteById(id)
 
-        logger.info { "Application deleted successfully: id=$id, name=${application.name}, bundleId=${application.bundleId}" }
-        // TODO: Delete APK files from file storage (to be implemented later)
+        logger.info { "Application deleted successfully: id=$id, name=${application.name}, bundleId=${application.bundleId}, deletedVersions=${versionCodes.size}" }
     }
 
     @Transactional
@@ -297,5 +317,157 @@ class ApplicationServiceImpl(
             versionName = savedVersion.versionName,
             stable = savedVersion.stable
         )
+    }
+
+    override fun updateVersionStability(applicationId: UUID, versionCode: Long, stable: Boolean): VersionDto {
+        logger.debug { "Attempting to update version stability: applicationId=$applicationId, versionCode=$versionCode, stable=$stable" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Find the version
+        val version = applicationRepository.findVersion(applicationId, versionCode)
+            ?: throw ApplicationVersionNotFoundException(applicationId, versionCode)
+
+        logger.debug { "Version found: versionCode=${version.versionCode}, versionName=${version.versionName}, currentStability=${version.stable}" }
+
+        // 3. Update the version stability
+        val updatedVersion = version.copy(stable = stable)
+
+        // 4. Save the updated version
+        val savedVersion = applicationRepository.saveVersion(updatedVersion)
+
+        logger.info { "Version stability updated successfully: applicationId=$applicationId, versionCode=$versionCode, stable=$stable" }
+
+        // 5. Map to DTO and return
+        return VersionDto(
+            versionCode = savedVersion.versionCode.toLong(),
+            versionName = savedVersion.versionName,
+            stable = savedVersion.stable
+        )
+    }
+
+    @Transactional
+    override fun deleteVersion(applicationId: UUID, versionCode: Long) {
+        logger.debug { "Attempting to delete version: applicationId=$applicationId, versionCode=$versionCode" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Verify version exists
+        val version = applicationRepository.findVersion(applicationId, versionCode)
+            ?: throw ApplicationVersionNotFoundException(applicationId, versionCode)
+
+        logger.debug { "Version found: versionCode=${version.versionCode}, versionName=${version.versionName}" }
+
+        // 3. Delete APK file from storage
+        try {
+            logger.debug { "Deleting APK file from storage: applicationId=$applicationId, versionCode=$versionCode" }
+            apkStorage.deleteApk(applicationId, versionCode)
+            logger.debug { "APK file deleted successfully" }
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to delete APK file for applicationId=$applicationId, versionCode=$versionCode. Continuing with database deletion." }
+            // Continue with database deletion even if file deletion fails
+        }
+
+        // 4. Delete version from database
+        applicationRepository.deleteVersion(applicationId, versionCode)
+
+        logger.info { "Version deleted successfully: applicationId=$applicationId, versionCode=$versionCode" }
+    }
+
+    override fun getVersion(applicationId: UUID, versionCode: Long): VersionDto {
+        logger.debug { "Attempting to get version: applicationId=$applicationId, versionCode=$versionCode" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Find the version
+        val version = applicationRepository.findVersion(applicationId, versionCode)
+            ?: throw ApplicationVersionNotFoundException(applicationId, versionCode)
+
+        logger.info { "Version found: versionCode=${version.versionCode}, versionName=${version.versionName}, stable=${version.stable}" }
+
+        // 3. Map to DTO and return
+        return VersionDto.fromDomain(version)
+    }
+
+    override fun getLatestVersion(applicationId: UUID): VersionDto {
+        logger.debug { "Attempting to get latest version for application: applicationId=$applicationId" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Find the latest version
+        val version = applicationRepository.findLatestVersion(applicationId)
+            ?: throw ApplicationVersionNotFoundException(applicationId)
+
+        logger.info { "Latest version found: versionCode=${version.versionCode}, versionName=${version.versionName}, stable=${version.stable}" }
+
+        // 3. Map to DTO and return
+        return VersionDto.fromDomain(version)
+    }
+
+    override fun getApkStream(applicationId: UUID, versionCode: Long): ApkStream {
+        logger.debug { "Attempting to get APK stream: applicationId=$applicationId, versionCode=$versionCode" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Verify version exists for this application
+        val version = applicationRepository.findVersion(applicationId, versionCode)
+            ?: throw ApplicationVersionNotFoundException(applicationId, versionCode)
+
+        logger.debug { "Version found: versionCode=${version.versionCode}, versionName=${version.versionName}" }
+
+        // 3. Load APK from storage
+        val inputStream = try {
+            apkStorage.loadApk(applicationId, versionCode)
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to load APK from storage: applicationId=$applicationId, versionCode=$versionCode" }
+            throw e
+        }
+
+        // 4. Derive file name
+        val fileName = "${application.bundleId}-v${versionCode}.apk"
+
+        logger.info { "APK stream loaded successfully: applicationId=$applicationId, versionCode=$versionCode, fileName=$fileName" }
+
+        return ApkStream(
+            inputStream = inputStream,
+            fileName = fileName
+        )
+    }
+
+    override fun listVersions(applicationId: UUID, pageable: Pageable): Page<ApplicationVersion> {
+        logger.debug { "Attempting to list versions for application: applicationId=$applicationId, page=${pageable.pageNumber}, size=${pageable.pageSize}" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Fetch versions page
+        val versionsPage = applicationRepository.findAllVersions(applicationId, pageable)
+
+        logger.info { "Retrieved ${versionsPage.totalElements} versions for application $applicationId, returning page ${versionsPage.number} of ${versionsPage.totalPages}" }
+
+        return versionsPage
     }
 }

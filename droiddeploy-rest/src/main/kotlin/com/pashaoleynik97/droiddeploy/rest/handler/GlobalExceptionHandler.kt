@@ -1,7 +1,10 @@
 package com.pashaoleynik97.droiddeploy.rest.handler
 
+import com.pashaoleynik97.droiddeploy.core.exception.ApkNotFoundException
+import com.pashaoleynik97.droiddeploy.core.exception.ApkStorageException
 import com.pashaoleynik97.droiddeploy.core.exception.ApplicationNotFoundException
 import com.pashaoleynik97.droiddeploy.core.exception.ApplicationVersionAlreadyExistsException
+import com.pashaoleynik97.droiddeploy.core.exception.ApplicationVersionNotFoundException
 import com.pashaoleynik97.droiddeploy.core.exception.BundleIdAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.DroidDeployException
 import com.pashaoleynik97.droiddeploy.core.exception.ForbiddenAccessException
@@ -215,6 +218,48 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.NOT_FOUND)
             .body(RestResponse.failure(error, "Application not found"))
+    }
+
+    @ExceptionHandler(ApplicationVersionNotFoundException::class)
+    fun handleApplicationVersionNotFound(ex: ApplicationVersionNotFoundException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Application version not found exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.NOT_FOUND,
+            message = ex.message ?: "Application version not found"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(RestResponse.failure(error, "Application version not found"))
+    }
+
+    @ExceptionHandler(ApkNotFoundException::class)
+    fun handleApkNotFound(ex: ApkNotFoundException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "APK not found exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.NOT_FOUND,
+            message = ex.message ?: "APK file not found"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(RestResponse.failure(error, "APK file not found"))
+    }
+
+    @ExceptionHandler(ApkStorageException::class)
+    fun handleApkStorageException(ex: ApkStorageException): ResponseEntity<RestResponse<Nothing>> {
+        logger.error(ex) { "APK storage exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.INTERNAL_ERROR,
+            message = ex.message ?: "Failed to access APK storage"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(RestResponse.failure(error, "APK storage operation failed"))
     }
 
     @ExceptionHandler(ForbiddenAccessException::class)

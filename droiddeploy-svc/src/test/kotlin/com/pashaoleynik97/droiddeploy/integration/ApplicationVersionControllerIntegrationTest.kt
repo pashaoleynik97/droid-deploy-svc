@@ -24,8 +24,12 @@ import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder
@@ -378,6 +382,773 @@ class ApplicationVersionControllerIntegrationTest : AbstractIntegrationTest() {
             .andExpect(jsonPath("$.data.versionCode").value(15))
     }
 
+    @Test
+    fun `updateVersionStability should return 200 when ADMIN updates version to stable`() {
+        // Given
+        val application = createTestApplication("com.example.adminstable")
+        createExistingVersion(application.id, versionCode = 10)
+
+        val requestBody = """{"stable": true}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 10)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.versionCode").value(10))
+            .andExpect(jsonPath("$.data.stable").value(true))
+            .andExpect(jsonPath("$.message").value("Version stability updated successfully"))
+
+        // Verify in DB
+        val versionEntity = jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(application.id, 10)
+        assertTrue(versionEntity != null && versionEntity.stable)
+    }
+
+    @Test
+    fun `updateVersionStability should return 200 when CI updates version to stable`() {
+        // Given
+        val application = createTestApplication("com.example.cistable")
+        createExistingVersion(application.id, versionCode = 5)
+
+        val requestBody = """{"stable": true}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 5)
+                .header("Authorization", "Bearer $ciAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.versionCode").value(5))
+            .andExpect(jsonPath("$.data.stable").value(true))
+    }
+
+    @Test
+    fun `updateVersionStability should return 200 when updating version to unstable`() {
+        // Given
+        val application = createTestApplication("com.example.unstable")
+        createExistingVersionWithStability(application.id, versionCode = 7, stable = true)
+
+        val requestBody = """{"stable": false}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 7)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.versionCode").value(7))
+            .andExpect(jsonPath("$.data.stable").value(false))
+
+        // Verify in DB
+        val versionEntity = jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(application.id, 7)
+        assertTrue(versionEntity != null && !versionEntity.stable)
+    }
+
+    @Test
+    fun `updateVersionStability should return 403 when CONSUMER tries to update`() {
+        // Given
+        val application = createTestApplication("com.example.consumerdeniedstable")
+        createExistingVersion(application.id, versionCode = 3)
+
+        val requestBody = """{"stable": true}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 3)
+                .header("Authorization", "Bearer $consumerAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `updateVersionStability should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+        val requestBody = """{"stable": true}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", nonExistentApplicationId, 1)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `updateVersionStability should return 404 when version not found`() {
+        // Given
+        val application = createTestApplication("com.example.versionnotfound")
+        val requestBody = """{"stable": true}"""
+
+        // When & Then
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 999)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `updateVersionStability should allow toggling stability back and forth`() {
+        // Given
+        val application = createTestApplication("com.example.toggle")
+        createExistingVersion(application.id, versionCode = 20)
+
+        // When - set to stable
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 20)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"stable": true}""")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.stable").value(true))
+
+        // Then - set back to unstable
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 20)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"stable": false}""")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.stable").value(false))
+
+        // And - set to stable again
+        mockMvc.perform(
+            put("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 20)
+                .header("Authorization", "Bearer $adminAccessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"stable": true}""")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.stable").value(true))
+    }
+
+    @Test
+    fun `deleteVersion should return 200 when ADMIN deletes version`() {
+        // Given
+        val application = createTestApplication("com.example.admindelete")
+        createExistingVersion(application.id, versionCode = 15)
+
+        // When & Then
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 15)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Deleted"))
+
+        // Verify version was deleted from DB
+        val versionEntity = jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(application.id, 15)
+        assertTrue(versionEntity == null, "Version should be deleted from database")
+    }
+
+    @Test
+    fun `deleteVersion should return 403 when CI tries to delete`() {
+        // Given
+        val application = createTestApplication("com.example.cidelete")
+        createExistingVersion(application.id, versionCode = 10)
+
+        // When & Then
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 10)
+                .header("Authorization", "Bearer $ciAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+
+        // Verify version still exists
+        val versionEntity = jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(application.id, 10)
+        assertTrue(versionEntity != null, "Version should not be deleted")
+    }
+
+    @Test
+    fun `deleteVersion should return 403 when CONSUMER tries to delete`() {
+        // Given
+        val application = createTestApplication("com.example.consumerdelete")
+        createExistingVersion(application.id, versionCode = 8)
+
+        // When & Then
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 8)
+                .header("Authorization", "Bearer $consumerAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+
+        // Verify version still exists
+        val versionEntity = jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(application.id, 8)
+        assertTrue(versionEntity != null, "Version should not be deleted")
+    }
+
+    @Test
+    fun `deleteVersion should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+
+        // When & Then
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", nonExistentApplicationId, 1)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `deleteVersion should return 404 when version not found`() {
+        // Given
+        val application = createTestApplication("com.example.versionnotfounddelete")
+
+        // When & Then
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 999)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `deleteVersion should delete APK file from storage`() {
+        // Given
+        val application = createTestApplication("com.example.deletewithapk")
+        val apkBytes = "fake apk content".toByteArray()
+        val apkFile = MockMultipartFile("file", "test.apk", "application/vnd.android.package-archive", apkBytes)
+
+        val metadata = ApkMetadata(
+            versionCode = 25,
+            versionName = "2.5.0",
+            signingCertificateSha256 = "CERT_SHA256_DELETE"
+        )
+
+        testApkMetadataExtractor.setMetadata(metadata)
+
+        // Upload version first
+        mockMvc.perform(
+            multipart("/api/v1/application/{applicationId}/version", application.id)
+                .file(apkFile)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andExpect(status().isCreated)
+
+        // Verify APK file exists
+        val apkPath = Path.of(storageProperties.root).resolve(ApkPathResolver.relativePath(application.id, 25L))
+        assertTrue(Files.exists(apkPath), "APK file should exist before deletion")
+
+        // When - delete version
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 25)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andExpect(status().isOk)
+
+        // Then - verify APK file was deleted
+        assertTrue(!Files.exists(apkPath), "APK file should be deleted from storage")
+    }
+
+    @Test
+    fun `getVersion should return 200 with correct VersionDto when ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.getversion")
+        createExistingVersionWithStability(application.id, 42, stable = true)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 42)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Version retrieved successfully"))
+            .andExpect(jsonPath("$.data.versionCode").value(42))
+            .andExpect(jsonPath("$.data.versionName").value("Version 42"))
+            .andExpect(jsonPath("$.data.stable").value(true))
+    }
+
+    @Test
+    fun `getVersion should return 403 when non-ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.getversionforbidden")
+        createExistingVersion(application.id, 10)
+
+        // When & Then - CI user
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 10)
+                .header("Authorization", "Bearer $ciAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+
+        // When & Then - CONSUMER user
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 10)
+                .header("Authorization", "Bearer $consumerAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `getVersion should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}", nonExistentApplicationId, 1)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `getVersion should return 404 when version not found`() {
+        // Given
+        val application = createTestApplication("com.example.versionnotfoundget")
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 999)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `listVersions should return 200 with paged response when ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.listversions")
+        createExistingVersion(application.id, 1)
+        createExistingVersion(application.id, 2)
+        createExistingVersion(application.id, 3)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .param("page", "0")
+                .param("size", "20")
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Versions retrieved successfully"))
+            .andExpect(jsonPath("$.data.content").isArray)
+            .andExpect(jsonPath("$.data.content.length()").value(3))
+            .andExpect(jsonPath("$.data.page").value(0))
+            .andExpect(jsonPath("$.data.size").value(20))
+            .andExpect(jsonPath("$.data.totalElements").value(3))
+            .andExpect(jsonPath("$.data.totalPages").value(1))
+    }
+
+    @Test
+    fun `listVersions should return versions sorted by createdAt descending`() {
+        // Given
+        val application = createTestApplication("com.example.listversionssorted")
+        Thread.sleep(10)
+        createExistingVersion(application.id, 1)
+        Thread.sleep(10)
+        createExistingVersion(application.id, 2)
+        Thread.sleep(10)
+        createExistingVersion(application.id, 3)
+
+        // When & Then - newest version should be first
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.content[0].versionCode").value(3))
+            .andExpect(jsonPath("$.data.content[1].versionCode").value(2))
+            .andExpect(jsonPath("$.data.content[2].versionCode").value(1))
+    }
+
+    @Test
+    fun `listVersions should respect page size limit of 100`() {
+        // Given
+        val application = createTestApplication("com.example.listversionsmaxsize")
+        createExistingVersion(application.id, 1)
+
+        // When & Then - request size of 200, should be capped at 100
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .param("page", "0")
+                .param("size", "200")
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.size").value(100)) // Page size capped at 100
+            .andExpect(jsonPath("$.data.content.length()").value(1)) // Only 1 version exists
+    }
+
+    @Test
+    fun `listVersions should return 403 when non-ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.listversionsforbidden")
+        createExistingVersion(application.id, 1)
+
+        // When & Then - CI user
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .header("Authorization", "Bearer $ciAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+
+        // When & Then - CONSUMER user
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .header("Authorization", "Bearer $consumerAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `listVersions should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", nonExistentApplicationId)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `listVersions should handle pagination correctly`() {
+        // Given
+        val application = createTestApplication("com.example.listversionspagination")
+        for (i in 1..5) {
+            Thread.sleep(10)
+            createExistingVersion(application.id, i)
+        }
+
+        // When & Then - page 0, size 2
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .param("page", "0")
+                .param("size", "2")
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.content.length()").value(2))
+            .andExpect(jsonPath("$.data.page").value(0))
+            .andExpect(jsonPath("$.data.size").value(2))
+            .andExpect(jsonPath("$.data.totalElements").value(5))
+            .andExpect(jsonPath("$.data.totalPages").value(3))
+            .andExpect(jsonPath("$.data.content[0].versionCode").value(5)) // Newest first
+            .andExpect(jsonPath("$.data.content[1].versionCode").value(4))
+
+        // When & Then - page 1, size 2
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .param("page", "1")
+                .param("size", "2")
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.content.length()").value(2))
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.content[0].versionCode").value(3))
+            .andExpect(jsonPath("$.data.content[1].versionCode").value(2))
+    }
+
+    @Test
+    fun `getLatestVersion should return 200 with latest version when ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.latestadmin")
+        createExistingVersion(application.id, 5)
+        createExistingVersion(application.id, 10)
+        createExistingVersion(application.id, 3)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", application.id)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Latest version retrieved successfully"))
+            .andExpect(jsonPath("$.data.versionCode").value(10)) // Highest version code
+            .andExpect(jsonPath("$.data.versionName").value("Version 10"))
+    }
+
+    @Test
+    fun `getLatestVersion should return 200 with latest version when CONSUMER requests`() {
+        // Given
+        val application = createTestApplication("com.example.latestconsumer")
+        createExistingVersion(application.id, 2)
+        createExistingVersion(application.id, 7)
+        createExistingVersion(application.id, 4)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", application.id)
+                .header("Authorization", "Bearer $consumerAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Latest version retrieved successfully"))
+            .andExpect(jsonPath("$.data.versionCode").value(7)) // Highest version code
+            .andExpect(jsonPath("$.data.versionName").value("Version 7"))
+    }
+
+    @Test
+    fun `getLatestVersion should return 403 when CI user requests`() {
+        // Given
+        val application = createTestApplication("com.example.latestci")
+        createExistingVersion(application.id, 1)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", application.id)
+                .header("Authorization", "Bearer $ciAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `getLatestVersion should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", nonExistentApplicationId)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `getLatestVersion should return 404 when application has no versions`() {
+        // Given
+        val application = createTestApplication("com.example.noversionlatest")
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", application.id)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+            .andExpect(jsonPath("$.errors[0].message").value("No versions found for application with applicationId='${application.id}'"))
+    }
+
+    @Test
+    fun `getLatestVersion should return correct version when only one version exists`() {
+        // Given
+        val application = createTestApplication("com.example.latestsingle")
+        createExistingVersionWithStability(application.id, 42, stable = true)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", application.id)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.versionCode").value(42))
+            .andExpect(jsonPath("$.data.versionName").value("Version 42"))
+            .andExpect(jsonPath("$.data.stable").value(true))
+    }
+
+    @Test
+    fun `downloadApk should return 200 with APK file when ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.downloadapkadmin")
+        val apkBytes = "fake apk content for download".toByteArray()
+        val apkFile = MockMultipartFile("file", "test.apk", "application/vnd.android.package-archive", apkBytes)
+
+        val metadata = ApkMetadata(
+            versionCode = 100,
+            versionName = "10.0.0",
+            signingCertificateSha256 = "CERT_SHA256_DOWNLOAD"
+        )
+
+        testApkMetadataExtractor.setMetadata(metadata)
+
+        // Upload version first
+        mockMvc.perform(
+            multipart("/api/v1/application/{applicationId}/version", application.id)
+                .file(apkFile)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andExpect(status().isCreated)
+
+        // When & Then - download APK
+        val result = mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", application.id, 100)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(header().string("Content-Type", "application/vnd.android.package-archive"))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"${application.bundleId}-v100.apk\""))
+            .andReturn()
+
+        // Verify content
+        val downloadedBytes = result.response.contentAsByteArray
+        assertTrue(downloadedBytes.isNotEmpty(), "Downloaded APK should not be empty")
+        assertTrue(downloadedBytes.contentEquals(apkBytes), "Downloaded APK content should match uploaded content")
+    }
+
+    @Test
+    fun `downloadApk should return 200 with APK file when CONSUMER requests`() {
+        // Given
+        val application = createTestApplication("com.example.downloadapkconsumer")
+        val apkBytes = "consumer apk download test".toByteArray()
+        val apkFile = MockMultipartFile("file", "test.apk", "application/vnd.android.package-archive", apkBytes)
+
+        val metadata = ApkMetadata(
+            versionCode = 50,
+            versionName = "5.0.0",
+            signingCertificateSha256 = "CERT_SHA256_CONSUMER"
+        )
+
+        testApkMetadataExtractor.setMetadata(metadata)
+
+        // Upload version first
+        mockMvc.perform(
+            multipart("/api/v1/application/{applicationId}/version", application.id)
+                .file(apkFile)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andExpect(status().isCreated)
+
+        // When & Then - CONSUMER downloads APK
+        val result = mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", application.id, 50)
+                .header("Authorization", "Bearer $consumerAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(header().string("Content-Type", "application/vnd.android.package-archive"))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"${application.bundleId}-v50.apk\""))
+            .andReturn()
+
+        // Verify content
+        val downloadedBytes = result.response.contentAsByteArray
+        assertTrue(downloadedBytes.isNotEmpty(), "Downloaded APK should not be empty")
+        assertTrue(downloadedBytes.contentEquals(apkBytes), "Downloaded APK content should match uploaded content")
+    }
+
+    @Test
+    fun `downloadApk should return 403 when CI user requests`() {
+        // Given
+        val application = createTestApplication("com.example.downloadapkci")
+        createExistingVersion(application.id, 1)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", application.id, 1)
+                .header("Authorization", "Bearer $ciAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `downloadApk should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", nonExistentApplicationId, 1)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `downloadApk should return 404 when version not found`() {
+        // Given
+        val application = createTestApplication("com.example.downloadapkversionnotfound")
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", application.id, 999)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `downloadApk should return 404 when APK file is missing`() {
+        // Given
+        val application = createTestApplication("com.example.downloadapkmissing")
+        createExistingVersion(application.id, 77)
+
+        // When & Then - APK file doesn't exist on disk
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", application.id, 77)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+    }
+
     // Helper methods
 
     private fun createTestApplication(bundleId: String): Application {
@@ -410,6 +1181,19 @@ class ApplicationVersionControllerIntegrationTest : AbstractIntegrationTest() {
             versionName = "Version $versionCode",
             versionCode = versionCode.toLong(),
             stable = false,
+            createdAt = Instant.now()
+        )
+        jpaApplicationVersionRepository.save(versionEntity)
+    }
+
+    private fun createExistingVersionWithStability(applicationId: UUID, versionCode: Int, stable: Boolean) {
+        val applicationEntity = jpaApplicationRepository.findById(applicationId).orElseThrow()
+        val versionEntity = ApplicationVersionEntity(
+            id = UUID.randomUUID(),
+            application = applicationEntity,
+            versionName = "Version $versionCode",
+            versionCode = versionCode.toLong(),
+            stable = stable,
             createdAt = Instant.now()
         )
         jpaApplicationVersionRepository.save(versionEntity)

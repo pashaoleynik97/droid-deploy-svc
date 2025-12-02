@@ -19,4 +19,10 @@ interface ApplicationRepository {
     fun saveVersion(applicationVersion: ApplicationVersion): ApplicationVersion
     fun findMaxVersionCode(applicationId: UUID): Int?
     fun versionExists(applicationId: UUID, versionCode: Int): Boolean
+    fun findVersion(applicationId: UUID, versionCode: Long): ApplicationVersion?
+    fun findLatestVersion(applicationId: UUID): ApplicationVersion?
+    fun deleteVersion(applicationId: UUID, versionCode: Long)
+    fun findAllVersions(applicationId: UUID): List<ApplicationVersion>
+    fun findAllVersions(applicationId: UUID, pageable: Pageable): Page<ApplicationVersion>
+    fun findAllVersionCodes(applicationId: UUID): List<Long>
 }
