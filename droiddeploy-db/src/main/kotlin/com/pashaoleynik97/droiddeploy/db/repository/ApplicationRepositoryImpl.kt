@@ -86,6 +86,11 @@ class ApplicationRepositoryImpl(
         return jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(applicationId, versionCode)?.toDomain()
     }
 
+    override fun findLatestVersion(applicationId: UUID): ApplicationVersion? {
+        logger.trace { "Querying database for latest version of application: applicationId=$applicationId" }
+        return jpaApplicationVersionRepository.findTopByApplicationIdOrderByVersionCodeDesc(applicationId)?.toDomain()
+    }
+
     override fun deleteVersion(applicationId: UUID, versionCode: Long) {
         logger.debug { "Deleting application version from database: applicationId=$applicationId, versionCode=$versionCode" }
         jpaApplicationVersionRepository.deleteByApplicationIdAndVersionCode(applicationId, versionCode)

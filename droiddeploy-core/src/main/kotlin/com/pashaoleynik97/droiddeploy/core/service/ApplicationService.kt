@@ -20,5 +20,6 @@ interface ApplicationService {
     fun updateVersionStability(applicationId: UUID, versionCode: Long, stable: Boolean): VersionDto
     fun deleteVersion(applicationId: UUID, versionCode: Long)
     fun getVersion(applicationId: UUID, versionCode: Long): VersionDto
+    fun getLatestVersion(applicationId: UUID): VersionDto
     fun listVersions(applicationId: UUID, pageable: Pageable): Page<ApplicationVersion>
 }

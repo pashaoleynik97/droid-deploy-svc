@@ -26,6 +26,9 @@ interface JpaApplicationVersionRepository : JpaRepository<ApplicationVersionEnti
 
     fun findAllByApplicationId(applicationId: UUID, pageable: Pageable): Page<ApplicationVersionEntity>
 
+    @Query("SELECT v FROM ApplicationVersionEntity v WHERE v.application.id = :applicationId ORDER BY v.versionCode DESC LIMIT 1")
+    fun findTopByApplicationIdOrderByVersionCodeDesc(@Param("applicationId") applicationId: UUID): ApplicationVersionEntity?
+
     @Query("SELECT v.versionCode FROM ApplicationVersionEntity v WHERE v.application.id = :applicationId")
     fun findVersionCodesByApplicationId(@Param("applicationId") applicationId: UUID): List<Long>
 }

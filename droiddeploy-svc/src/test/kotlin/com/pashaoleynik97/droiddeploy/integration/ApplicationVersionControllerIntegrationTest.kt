@@ -902,6 +902,114 @@ class ApplicationVersionControllerIntegrationTest : AbstractIntegrationTest() {
             .andExpect(jsonPath("$.data.content[1].versionCode").value(2))
     }
 
+    @Test
+    fun `getLatestVersion should return 200 with latest version when ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.latestadmin")
+        createExistingVersion(application.id, 5)
+        createExistingVersion(application.id, 10)
+        createExistingVersion(application.id, 3)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", application.id)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Latest version retrieved successfully"))
+            .andExpect(jsonPath("$.data.versionCode").value(10)) // Highest version code
+            .andExpect(jsonPath("$.data.versionName").value("Version 10"))
+    }
+
+    @Test
+    fun `getLatestVersion should return 200 with latest version when CONSUMER requests`() {
+        // Given
+        val application = createTestApplication("com.example.latestconsumer")
+        createExistingVersion(application.id, 2)
+        createExistingVersion(application.id, 7)
+        createExistingVersion(application.id, 4)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", application.id)
+                .header("Authorization", "Bearer $consumerAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Latest version retrieved successfully"))
+            .andExpect(jsonPath("$.data.versionCode").value(7)) // Highest version code
+            .andExpect(jsonPath("$.data.versionName").value("Version 7"))
+    }
+
+    @Test
+    fun `getLatestVersion should return 403 when CI user requests`() {
+        // Given
+        val application = createTestApplication("com.example.latestci")
+        createExistingVersion(application.id, 1)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", application.id)
+                .header("Authorization", "Bearer $ciAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `getLatestVersion should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", nonExistentApplicationId)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `getLatestVersion should return 404 when application has no versions`() {
+        // Given
+        val application = createTestApplication("com.example.noversionlatest")
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", application.id)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+            .andExpect(jsonPath("$.errors[0].message").value("No versions found for application with applicationId='${application.id}'"))
+    }
+
+    @Test
+    fun `getLatestVersion should return correct version when only one version exists`() {
+        // Given
+        val application = createTestApplication("com.example.latestsingle")
+        createExistingVersionWithStability(application.id, 42, stable = true)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/latest", application.id)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.versionCode").value(42))
+            .andExpect(jsonPath("$.data.versionName").value("Version 42"))
+            .andExpect(jsonPath("$.data.stable").value(true))
+    }
+
     // Helper methods
 
     private fun createTestApplication(bundleId: String): Application {

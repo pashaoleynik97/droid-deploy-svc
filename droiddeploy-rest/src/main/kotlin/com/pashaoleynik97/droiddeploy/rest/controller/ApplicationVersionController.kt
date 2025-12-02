@@ -53,6 +53,21 @@ class ApplicationVersionController(
             .ok(RestResponse.success(pagedResponse, "Versions retrieved successfully"))
     }
 
+    @GetMapping("/{applicationId}/version/latest")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONSUMER')")
+    fun getLatestVersion(
+        @PathVariable applicationId: UUID
+    ): ResponseEntity<RestResponse<VersionDto>> {
+        logger.info { "GET /api/v1/application/{applicationId}/version/latest - Get latest version request: applicationId=$applicationId" }
+
+        val versionDto = applicationService.getLatestVersion(applicationId)
+
+        logger.info { "Latest version retrieved successfully: applicationId=$applicationId, versionCode=${versionDto.versionCode}, versionName=${versionDto.versionName}" }
+
+        return ResponseEntity
+            .ok(RestResponse.success(versionDto, "Latest version retrieved successfully"))
+    }
+
     @GetMapping("/{applicationId}/version/{versionCode}")
     @PreAuthorize("hasRole('ADMIN')")
     fun getVersion(

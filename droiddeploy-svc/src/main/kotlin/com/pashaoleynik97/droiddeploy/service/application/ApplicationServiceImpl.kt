@@ -400,6 +400,25 @@ class ApplicationServiceImpl(
         return VersionDto.fromDomain(version)
     }
 
+    override fun getLatestVersion(applicationId: UUID): VersionDto {
+        logger.debug { "Attempting to get latest version for application: applicationId=$applicationId" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Find the latest version
+        val version = applicationRepository.findLatestVersion(applicationId)
+            ?: throw ApplicationVersionNotFoundException(applicationId)
+
+        logger.info { "Latest version found: versionCode=${version.versionCode}, versionName=${version.versionName}, stable=${version.stable}" }
+
+        // 3. Map to DTO and return
+        return VersionDto.fromDomain(version)
+    }
+
     override fun listVersions(applicationId: UUID, pageable: Pageable): Page<ApplicationVersion> {
         logger.debug { "Attempting to list versions for application: applicationId=$applicationId, page=${pageable.pageNumber}, size=${pageable.pageSize}" }
 
