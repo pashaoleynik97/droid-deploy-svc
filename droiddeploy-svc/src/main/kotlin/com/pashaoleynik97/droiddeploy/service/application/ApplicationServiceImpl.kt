@@ -172,6 +172,7 @@ class ApplicationServiceImpl(
         return ApplicationResponseDto.fromDomain(application)
     }
 
+    @Transactional
     override fun deleteApplication(id: UUID) {
         logger.debug { "Attempting to delete application by id: $id" }
 
@@ -179,11 +180,28 @@ class ApplicationServiceImpl(
         val application = applicationRepository.findById(id)
             ?: throw ApplicationNotFoundException(id)
 
+        logger.debug { "Application found: id=${application.id}, name=${application.name}, bundleId=${application.bundleId}" }
+
+        // Get all version codes for this application
+        val versionCodes = applicationRepository.findAllVersionCodes(id)
+        logger.debug { "Found ${versionCodes.size} version(s) to delete for application $id" }
+
+        // Delete APK files from storage for each version
+        for (versionCode in versionCodes) {
+            try {
+                logger.debug { "Deleting APK file: applicationId=$id, versionCode=$versionCode" }
+                apkStorage.deleteApk(id, versionCode.toLong())
+                logger.debug { "APK file deleted successfully: versionCode=$versionCode" }
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to delete APK file for applicationId=$id, versionCode=$versionCode. Continuing with next file." }
+                // Continue with next file deletion and database cleanup
+            }
+        }
+
         // Delete application (versions will be deleted by DB cascade)
         applicationRepository.deleteById(id)
 
-        logger.info { "Application deleted successfully: id=$id, name=${application.name}, bundleId=${application.bundleId}" }
-        // TODO: Delete APK files from file storage (to be implemented later)
+        logger.info { "Application deleted successfully: id=$id, name=${application.name}, bundleId=${application.bundleId}, deletedVersions=${versionCodes.size}" }
     }
 
     @Transactional
@@ -329,5 +347,37 @@ class ApplicationServiceImpl(
             versionName = savedVersion.versionName,
             stable = savedVersion.stable
         )
+    }
+
+    @Transactional
+    override fun deleteVersion(applicationId: UUID, versionCode: Long) {
+        logger.debug { "Attempting to delete version: applicationId=$applicationId, versionCode=$versionCode" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Verify version exists
+        val version = applicationRepository.findVersion(applicationId, versionCode)
+            ?: throw ApplicationVersionNotFoundException(applicationId, versionCode)
+
+        logger.debug { "Version found: versionCode=${version.versionCode}, versionName=${version.versionName}" }
+
+        // 3. Delete APK file from storage
+        try {
+            logger.debug { "Deleting APK file from storage: applicationId=$applicationId, versionCode=$versionCode" }
+            apkStorage.deleteApk(applicationId, versionCode)
+            logger.debug { "APK file deleted successfully" }
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to delete APK file for applicationId=$applicationId, versionCode=$versionCode. Continuing with database deletion." }
+            // Continue with database deletion even if file deletion fails
+        }
+
+        // 4. Delete version from database
+        applicationRepository.deleteVersion(applicationId, versionCode)
+
+        logger.info { "Version deleted successfully: applicationId=$applicationId, versionCode=$versionCode" }
     }
 }

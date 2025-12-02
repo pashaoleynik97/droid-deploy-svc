@@ -61,4 +61,20 @@ class ApplicationVersionController(
         return ResponseEntity
             .ok(RestResponse.success(versionDto, "Version stability updated successfully"))
     }
+
+    @DeleteMapping("/{applicationId}/version/{versionCode}")
+    @PreAuthorize("hasRole('ADMIN')")
+    fun deleteVersion(
+        @PathVariable applicationId: UUID,
+        @PathVariable versionCode: Long
+    ): ResponseEntity<RestResponse<Nothing>> {
+        logger.info { "DELETE /api/v1/application/{applicationId}/version/{versionCode} - Delete version request: applicationId=$applicationId, versionCode=$versionCode" }
+
+        applicationService.deleteVersion(applicationId, versionCode)
+
+        logger.info { "Version deleted successfully: applicationId=$applicationId, versionCode=$versionCode" }
+
+        return ResponseEntity
+            .ok(RestResponse.success(null, "Deleted"))
+    }
 }

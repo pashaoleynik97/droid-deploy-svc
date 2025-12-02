@@ -24,6 +24,7 @@ import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
@@ -545,6 +546,135 @@ class ApplicationVersionControllerIntegrationTest : AbstractIntegrationTest() {
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.stable").value(true))
+    }
+
+    @Test
+    fun `deleteVersion should return 200 when ADMIN deletes version`() {
+        // Given
+        val application = createTestApplication("com.example.admindelete")
+        createExistingVersion(application.id, versionCode = 15)
+
+        // When & Then
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 15)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Deleted"))
+
+        // Verify version was deleted from DB
+        val versionEntity = jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(application.id, 15)
+        assertTrue(versionEntity == null, "Version should be deleted from database")
+    }
+
+    @Test
+    fun `deleteVersion should return 403 when CI tries to delete`() {
+        // Given
+        val application = createTestApplication("com.example.cidelete")
+        createExistingVersion(application.id, versionCode = 10)
+
+        // When & Then
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 10)
+                .header("Authorization", "Bearer $ciAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+
+        // Verify version still exists
+        val versionEntity = jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(application.id, 10)
+        assertTrue(versionEntity != null, "Version should not be deleted")
+    }
+
+    @Test
+    fun `deleteVersion should return 403 when CONSUMER tries to delete`() {
+        // Given
+        val application = createTestApplication("com.example.consumerdelete")
+        createExistingVersion(application.id, versionCode = 8)
+
+        // When & Then
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 8)
+                .header("Authorization", "Bearer $consumerAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+
+        // Verify version still exists
+        val versionEntity = jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(application.id, 8)
+        assertTrue(versionEntity != null, "Version should not be deleted")
+    }
+
+    @Test
+    fun `deleteVersion should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+
+        // When & Then
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", nonExistentApplicationId, 1)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `deleteVersion should return 404 when version not found`() {
+        // Given
+        val application = createTestApplication("com.example.versionnotfounddelete")
+
+        // When & Then
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 999)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `deleteVersion should delete APK file from storage`() {
+        // Given
+        val application = createTestApplication("com.example.deletewithapk")
+        val apkBytes = "fake apk content".toByteArray()
+        val apkFile = MockMultipartFile("file", "test.apk", "application/vnd.android.package-archive", apkBytes)
+
+        val metadata = ApkMetadata(
+            versionCode = 25,
+            versionName = "2.5.0",
+            signingCertificateSha256 = "CERT_SHA256_DELETE"
+        )
+
+        testApkMetadataExtractor.setMetadata(metadata)
+
+        // Upload version first
+        mockMvc.perform(
+            multipart("/api/v1/application/{applicationId}/version", application.id)
+                .file(apkFile)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andExpect(status().isCreated)
+
+        // Verify APK file exists
+        val apkPath = Path.of(storageProperties.root).resolve(ApkPathResolver.relativePath(application.id, 25L))
+        assertTrue(Files.exists(apkPath), "APK file should exist before deletion")
+
+        // When - delete version
+        mockMvc.perform(
+            delete("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 25)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andExpect(status().isOk)
+
+        // Then - verify APK file was deleted
+        assertTrue(!Files.exists(apkPath), "APK file should be deleted from storage")
     }
 
     // Helper methods

@@ -17,4 +17,11 @@ interface JpaApplicationVersionRepository : JpaRepository<ApplicationVersionEnti
     fun findMaxVersionCodeByApplicationId(@Param("applicationId") applicationId: UUID): Long?
 
     fun findByApplicationIdAndVersionCode(applicationId: UUID, versionCode: Long): ApplicationVersionEntity?
+
+    fun deleteByApplicationIdAndVersionCode(applicationId: UUID, versionCode: Long)
+
+    fun findAllByApplicationId(applicationId: UUID): List<ApplicationVersionEntity>
+
+    @Query("SELECT v.versionCode FROM ApplicationVersionEntity v WHERE v.application.id = :applicationId")
+    fun findVersionCodesByApplicationId(@Param("applicationId") applicationId: UUID): List<Long>
 }

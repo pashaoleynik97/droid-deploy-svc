@@ -85,4 +85,20 @@ class ApplicationRepositoryImpl(
         logger.trace { "Querying database for application version: applicationId=$applicationId, versionCode=$versionCode" }
         return jpaApplicationVersionRepository.findByApplicationIdAndVersionCode(applicationId, versionCode)?.toDomain()
     }
+
+    override fun deleteVersion(applicationId: UUID, versionCode: Long) {
+        logger.debug { "Deleting application version from database: applicationId=$applicationId, versionCode=$versionCode" }
+        jpaApplicationVersionRepository.deleteByApplicationIdAndVersionCode(applicationId, versionCode)
+        logger.trace { "Application version deleted successfully: applicationId=$applicationId, versionCode=$versionCode" }
+    }
+
+    override fun findAllVersions(applicationId: UUID): List<ApplicationVersion> {
+        logger.trace { "Querying database for all versions of application: applicationId=$applicationId" }
+        return jpaApplicationVersionRepository.findAllByApplicationId(applicationId).map { it.toDomain() }
+    }
+
+    override fun findAllVersionCodes(applicationId: UUID): List<Long> {
+        logger.trace { "Querying database for all version codes of application: applicationId=$applicationId" }
+        return jpaApplicationVersionRepository.findVersionCodesByApplicationId(applicationId)
+    }
 }
