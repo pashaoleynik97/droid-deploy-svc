@@ -6,8 +6,10 @@ import com.pashaoleynik97.droiddeploy.core.service.ApplicationService
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.PagedResponse
 import com.pashaoleynik97.droiddeploy.rest.model.wrapper.RestResponse
 import mu.KotlinLogging
+import org.springframework.core.io.InputStreamResource
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -82,6 +84,26 @@ class ApplicationVersionController(
 
         return ResponseEntity
             .ok(RestResponse.success(versionDto, "Version retrieved successfully"))
+    }
+
+    @GetMapping("/{applicationId}/version/{versionCode}/apk")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CONSUMER')")
+    fun downloadApk(
+        @PathVariable applicationId: UUID,
+        @PathVariable versionCode: Long
+    ): ResponseEntity<InputStreamResource> {
+        logger.info { "GET /api/v1/application/{applicationId}/version/{versionCode}/apk - Download APK request: applicationId=$applicationId, versionCode=$versionCode" }
+
+        val apkStream = applicationService.getApkStream(applicationId, versionCode)
+        val resource = InputStreamResource(apkStream.inputStream)
+
+        logger.info { "APK download initiated: applicationId=$applicationId, versionCode=$versionCode, fileName=${apkStream.fileName}" }
+
+        return ResponseEntity
+            .ok()
+            .contentType(MediaType.parseMediaType("application/vnd.android.package-archive"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${apkStream.fileName}\"")
+            .body(resource)
     }
 
     @PostMapping("/{applicationId}/version", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])

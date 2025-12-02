@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder
@@ -1008,6 +1009,144 @@ class ApplicationVersionControllerIntegrationTest : AbstractIntegrationTest() {
             .andExpect(jsonPath("$.data.versionCode").value(42))
             .andExpect(jsonPath("$.data.versionName").value("Version 42"))
             .andExpect(jsonPath("$.data.stable").value(true))
+    }
+
+    @Test
+    fun `downloadApk should return 200 with APK file when ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.downloadapkadmin")
+        val apkBytes = "fake apk content for download".toByteArray()
+        val apkFile = MockMultipartFile("file", "test.apk", "application/vnd.android.package-archive", apkBytes)
+
+        val metadata = ApkMetadata(
+            versionCode = 100,
+            versionName = "10.0.0",
+            signingCertificateSha256 = "CERT_SHA256_DOWNLOAD"
+        )
+
+        testApkMetadataExtractor.setMetadata(metadata)
+
+        // Upload version first
+        mockMvc.perform(
+            multipart("/api/v1/application/{applicationId}/version", application.id)
+                .file(apkFile)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andExpect(status().isCreated)
+
+        // When & Then - download APK
+        val result = mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", application.id, 100)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(header().string("Content-Type", "application/vnd.android.package-archive"))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"${application.bundleId}-v100.apk\""))
+            .andReturn()
+
+        // Verify content
+        val downloadedBytes = result.response.contentAsByteArray
+        assertTrue(downloadedBytes.isNotEmpty(), "Downloaded APK should not be empty")
+        assertTrue(downloadedBytes.contentEquals(apkBytes), "Downloaded APK content should match uploaded content")
+    }
+
+    @Test
+    fun `downloadApk should return 200 with APK file when CONSUMER requests`() {
+        // Given
+        val application = createTestApplication("com.example.downloadapkconsumer")
+        val apkBytes = "consumer apk download test".toByteArray()
+        val apkFile = MockMultipartFile("file", "test.apk", "application/vnd.android.package-archive", apkBytes)
+
+        val metadata = ApkMetadata(
+            versionCode = 50,
+            versionName = "5.0.0",
+            signingCertificateSha256 = "CERT_SHA256_CONSUMER"
+        )
+
+        testApkMetadataExtractor.setMetadata(metadata)
+
+        // Upload version first
+        mockMvc.perform(
+            multipart("/api/v1/application/{applicationId}/version", application.id)
+                .file(apkFile)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andExpect(status().isCreated)
+
+        // When & Then - CONSUMER downloads APK
+        val result = mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", application.id, 50)
+                .header("Authorization", "Bearer $consumerAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(header().string("Content-Type", "application/vnd.android.package-archive"))
+            .andExpect(header().string("Content-Disposition", "attachment; filename=\"${application.bundleId}-v50.apk\""))
+            .andReturn()
+
+        // Verify content
+        val downloadedBytes = result.response.contentAsByteArray
+        assertTrue(downloadedBytes.isNotEmpty(), "Downloaded APK should not be empty")
+        assertTrue(downloadedBytes.contentEquals(apkBytes), "Downloaded APK content should match uploaded content")
+    }
+
+    @Test
+    fun `downloadApk should return 403 when CI user requests`() {
+        // Given
+        val application = createTestApplication("com.example.downloadapkci")
+        createExistingVersion(application.id, 1)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", application.id, 1)
+                .header("Authorization", "Bearer $ciAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `downloadApk should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", nonExistentApplicationId, 1)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `downloadApk should return 404 when version not found`() {
+        // Given
+        val application = createTestApplication("com.example.downloadapkversionnotfound")
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", application.id, 999)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `downloadApk should return 404 when APK file is missing`() {
+        // Given
+        val application = createTestApplication("com.example.downloadapkmissing")
+        createExistingVersion(application.id, 77)
+
+        // When & Then - APK file doesn't exist on disk
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}/apk", application.id, 77)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
     }
 
     // Helper methods

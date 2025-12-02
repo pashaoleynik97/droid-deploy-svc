@@ -2,6 +2,7 @@ package com.pashaoleynik97.droiddeploy.core.service
 
 import com.pashaoleynik97.droiddeploy.core.domain.Application
 import com.pashaoleynik97.droiddeploy.core.domain.ApplicationVersion
+import com.pashaoleynik97.droiddeploy.core.dto.application.ApkStream
 import com.pashaoleynik97.droiddeploy.core.dto.application.ApplicationResponseDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.CreateApplicationRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.UpdateApplicationRequestDto
@@ -21,5 +22,6 @@ interface ApplicationService {
     fun deleteVersion(applicationId: UUID, versionCode: Long)
     fun getVersion(applicationId: UUID, versionCode: Long): VersionDto
     fun getLatestVersion(applicationId: UUID): VersionDto
+    fun getApkStream(applicationId: UUID, versionCode: Long): ApkStream
     fun listVersions(applicationId: UUID, pageable: Pageable): Page<ApplicationVersion>
 }

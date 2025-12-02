@@ -2,6 +2,7 @@ package com.pashaoleynik97.droiddeploy.service.application
 
 import com.pashaoleynik97.droiddeploy.core.domain.Application
 import com.pashaoleynik97.droiddeploy.core.domain.ApplicationVersion
+import com.pashaoleynik97.droiddeploy.core.dto.application.ApkStream
 import com.pashaoleynik97.droiddeploy.core.dto.application.ApplicationResponseDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.CreateApplicationRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.application.UpdateApplicationRequestDto
@@ -417,6 +418,40 @@ class ApplicationServiceImpl(
 
         // 3. Map to DTO and return
         return VersionDto.fromDomain(version)
+    }
+
+    override fun getApkStream(applicationId: UUID, versionCode: Long): ApkStream {
+        logger.debug { "Attempting to get APK stream: applicationId=$applicationId, versionCode=$versionCode" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Verify version exists for this application
+        val version = applicationRepository.findVersion(applicationId, versionCode)
+            ?: throw ApplicationVersionNotFoundException(applicationId, versionCode)
+
+        logger.debug { "Version found: versionCode=${version.versionCode}, versionName=${version.versionName}" }
+
+        // 3. Load APK from storage
+        val inputStream = try {
+            apkStorage.loadApk(applicationId, versionCode)
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to load APK from storage: applicationId=$applicationId, versionCode=$versionCode" }
+            throw e
+        }
+
+        // 4. Derive file name
+        val fileName = "${application.bundleId}-v${versionCode}.apk"
+
+        logger.info { "APK stream loaded successfully: applicationId=$applicationId, versionCode=$versionCode, fileName=$fileName" }
+
+        return ApkStream(
+            inputStream = inputStream,
+            fileName = fileName
+        )
     }
 
     override fun listVersions(applicationId: UUID, pageable: Pageable): Page<ApplicationVersion> {
