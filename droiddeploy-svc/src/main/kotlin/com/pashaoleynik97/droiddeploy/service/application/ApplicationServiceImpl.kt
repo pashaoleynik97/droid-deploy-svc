@@ -380,4 +380,40 @@ class ApplicationServiceImpl(
 
         logger.info { "Version deleted successfully: applicationId=$applicationId, versionCode=$versionCode" }
     }
+
+    override fun getVersion(applicationId: UUID, versionCode: Long): VersionDto {
+        logger.debug { "Attempting to get version: applicationId=$applicationId, versionCode=$versionCode" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Find the version
+        val version = applicationRepository.findVersion(applicationId, versionCode)
+            ?: throw ApplicationVersionNotFoundException(applicationId, versionCode)
+
+        logger.info { "Version found: versionCode=${version.versionCode}, versionName=${version.versionName}, stable=${version.stable}" }
+
+        // 3. Map to DTO and return
+        return VersionDto.fromDomain(version)
+    }
+
+    override fun listVersions(applicationId: UUID, pageable: Pageable): Page<ApplicationVersion> {
+        logger.debug { "Attempting to list versions for application: applicationId=$applicationId, page=${pageable.pageNumber}, size=${pageable.pageSize}" }
+
+        // 1. Verify application exists
+        val application = applicationRepository.findById(applicationId)
+            ?: throw ApplicationNotFoundException(applicationId)
+
+        logger.debug { "Application found: id=${application.id}, bundleId=${application.bundleId}" }
+
+        // 2. Fetch versions page
+        val versionsPage = applicationRepository.findAllVersions(applicationId, pageable)
+
+        logger.info { "Retrieved ${versionsPage.totalElements} versions for application $applicationId, returning page ${versionsPage.number} of ${versionsPage.totalPages}" }
+
+        return versionsPage
+    }
 }

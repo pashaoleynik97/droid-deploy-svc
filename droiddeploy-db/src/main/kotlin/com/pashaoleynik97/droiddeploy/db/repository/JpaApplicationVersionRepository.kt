@@ -1,6 +1,8 @@
 package com.pashaoleynik97.droiddeploy.db.repository
 
 import com.pashaoleynik97.droiddeploy.db.entity.ApplicationVersionEntity
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -21,6 +23,8 @@ interface JpaApplicationVersionRepository : JpaRepository<ApplicationVersionEnti
     fun deleteByApplicationIdAndVersionCode(applicationId: UUID, versionCode: Long)
 
     fun findAllByApplicationId(applicationId: UUID): List<ApplicationVersionEntity>
+
+    fun findAllByApplicationId(applicationId: UUID, pageable: Pageable): Page<ApplicationVersionEntity>
 
     @Query("SELECT v.versionCode FROM ApplicationVersionEntity v WHERE v.application.id = :applicationId")
     fun findVersionCodesByApplicationId(@Param("applicationId") applicationId: UUID): List<Long>

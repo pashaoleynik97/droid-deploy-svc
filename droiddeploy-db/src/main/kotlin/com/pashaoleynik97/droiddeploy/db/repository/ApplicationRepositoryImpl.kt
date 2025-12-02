@@ -97,6 +97,13 @@ class ApplicationRepositoryImpl(
         return jpaApplicationVersionRepository.findAllByApplicationId(applicationId).map { it.toDomain() }
     }
 
+    override fun findAllVersions(applicationId: UUID, pageable: Pageable): Page<ApplicationVersion> {
+        logger.debug { "Querying database for versions of application: applicationId=$applicationId, page=${pageable.pageNumber}, size=${pageable.pageSize}" }
+        val result = jpaApplicationVersionRepository.findAllByApplicationId(applicationId, pageable)
+        logger.trace { "Found ${result.totalElements} versions for application: $applicationId" }
+        return result.map(ApplicationVersionEntity::toDomain)
+    }
+
     override fun findAllVersionCodes(applicationId: UUID): List<Long> {
         logger.trace { "Querying database for all version codes of application: applicationId=$applicationId" }
         return jpaApplicationVersionRepository.findVersionCodesByApplicationId(applicationId)

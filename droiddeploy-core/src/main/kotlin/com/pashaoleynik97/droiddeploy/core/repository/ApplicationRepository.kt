@@ -22,5 +22,6 @@ interface ApplicationRepository {
     fun findVersion(applicationId: UUID, versionCode: Long): ApplicationVersion?
     fun deleteVersion(applicationId: UUID, versionCode: Long)
     fun findAllVersions(applicationId: UUID): List<ApplicationVersion>
+    fun findAllVersions(applicationId: UUID, pageable: Pageable): Page<ApplicationVersion>
     fun findAllVersionCodes(applicationId: UUID): List<Long>
 }

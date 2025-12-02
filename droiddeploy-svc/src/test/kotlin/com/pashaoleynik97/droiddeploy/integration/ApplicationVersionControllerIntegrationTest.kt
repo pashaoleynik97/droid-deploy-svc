@@ -25,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers.print
@@ -675,6 +676,230 @@ class ApplicationVersionControllerIntegrationTest : AbstractIntegrationTest() {
 
         // Then - verify APK file was deleted
         assertTrue(!Files.exists(apkPath), "APK file should be deleted from storage")
+    }
+
+    @Test
+    fun `getVersion should return 200 with correct VersionDto when ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.getversion")
+        createExistingVersionWithStability(application.id, 42, stable = true)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 42)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Version retrieved successfully"))
+            .andExpect(jsonPath("$.data.versionCode").value(42))
+            .andExpect(jsonPath("$.data.versionName").value("Version 42"))
+            .andExpect(jsonPath("$.data.stable").value(true))
+    }
+
+    @Test
+    fun `getVersion should return 403 when non-ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.getversionforbidden")
+        createExistingVersion(application.id, 10)
+
+        // When & Then - CI user
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 10)
+                .header("Authorization", "Bearer $ciAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+
+        // When & Then - CONSUMER user
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 10)
+                .header("Authorization", "Bearer $consumerAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `getVersion should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}", nonExistentApplicationId, 1)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `getVersion should return 404 when version not found`() {
+        // Given
+        val application = createTestApplication("com.example.versionnotfoundget")
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version/{versionCode}", application.id, 999)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `listVersions should return 200 with paged response when ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.listversions")
+        createExistingVersion(application.id, 1)
+        createExistingVersion(application.id, 2)
+        createExistingVersion(application.id, 3)
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .param("page", "0")
+                .param("size", "20")
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.message").value("Versions retrieved successfully"))
+            .andExpect(jsonPath("$.data.content").isArray)
+            .andExpect(jsonPath("$.data.content.length()").value(3))
+            .andExpect(jsonPath("$.data.page").value(0))
+            .andExpect(jsonPath("$.data.size").value(20))
+            .andExpect(jsonPath("$.data.totalElements").value(3))
+            .andExpect(jsonPath("$.data.totalPages").value(1))
+    }
+
+    @Test
+    fun `listVersions should return versions sorted by createdAt descending`() {
+        // Given
+        val application = createTestApplication("com.example.listversionssorted")
+        Thread.sleep(10)
+        createExistingVersion(application.id, 1)
+        Thread.sleep(10)
+        createExistingVersion(application.id, 2)
+        Thread.sleep(10)
+        createExistingVersion(application.id, 3)
+
+        // When & Then - newest version should be first
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.content[0].versionCode").value(3))
+            .andExpect(jsonPath("$.data.content[1].versionCode").value(2))
+            .andExpect(jsonPath("$.data.content[2].versionCode").value(1))
+    }
+
+    @Test
+    fun `listVersions should respect page size limit of 100`() {
+        // Given
+        val application = createTestApplication("com.example.listversionsmaxsize")
+        createExistingVersion(application.id, 1)
+
+        // When & Then - request size of 200, should be capped at 100
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .param("page", "0")
+                .param("size", "200")
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.size").value(100)) // Page size capped at 100
+            .andExpect(jsonPath("$.data.content.length()").value(1)) // Only 1 version exists
+    }
+
+    @Test
+    fun `listVersions should return 403 when non-ADMIN requests`() {
+        // Given
+        val application = createTestApplication("com.example.listversionsforbidden")
+        createExistingVersion(application.id, 1)
+
+        // When & Then - CI user
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .header("Authorization", "Bearer $ciAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+
+        // When & Then - CONSUMER user
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .header("Authorization", "Bearer $consumerAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `listVersions should return 404 when application not found`() {
+        // Given
+        val nonExistentApplicationId = UUID.randomUUID()
+
+        // When & Then
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", nonExistentApplicationId)
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.errors[0].type").value("NOT_FOUND"))
+    }
+
+    @Test
+    fun `listVersions should handle pagination correctly`() {
+        // Given
+        val application = createTestApplication("com.example.listversionspagination")
+        for (i in 1..5) {
+            Thread.sleep(10)
+            createExistingVersion(application.id, i)
+        }
+
+        // When & Then - page 0, size 2
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .param("page", "0")
+                .param("size", "2")
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.content.length()").value(2))
+            .andExpect(jsonPath("$.data.page").value(0))
+            .andExpect(jsonPath("$.data.size").value(2))
+            .andExpect(jsonPath("$.data.totalElements").value(5))
+            .andExpect(jsonPath("$.data.totalPages").value(3))
+            .andExpect(jsonPath("$.data.content[0].versionCode").value(5)) // Newest first
+            .andExpect(jsonPath("$.data.content[1].versionCode").value(4))
+
+        // When & Then - page 1, size 2
+        mockMvc.perform(
+            get("/api/v1/application/{applicationId}/version", application.id)
+                .param("page", "1")
+                .param("size", "2")
+                .header("Authorization", "Bearer $adminAccessToken")
+        )
+            .andDo(print())
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.content.length()").value(2))
+            .andExpect(jsonPath("$.data.page").value(1))
+            .andExpect(jsonPath("$.data.content[0].versionCode").value(3))
+            .andExpect(jsonPath("$.data.content[1].versionCode").value(2))
     }
 
     // Helper methods
