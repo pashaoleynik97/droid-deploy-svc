@@ -1,5 +1,8 @@
 package com.pashaoleynik97.droiddeploy.rest.handler
 
+import com.pashaoleynik97.droiddeploy.core.exception.ApiKeyExpiredException
+import com.pashaoleynik97.droiddeploy.core.exception.ApiKeyNotFoundException
+import com.pashaoleynik97.droiddeploy.core.exception.ApiKeyRevokedException
 import com.pashaoleynik97.droiddeploy.core.exception.ApkNotFoundException
 import com.pashaoleynik97.droiddeploy.core.exception.ApkStorageException
 import com.pashaoleynik97.droiddeploy.core.exception.ApplicationNotFoundException
@@ -8,6 +11,8 @@ import com.pashaoleynik97.droiddeploy.core.exception.ApplicationVersionNotFoundE
 import com.pashaoleynik97.droiddeploy.core.exception.BundleIdAlreadyExistsException
 import com.pashaoleynik97.droiddeploy.core.exception.DroidDeployException
 import com.pashaoleynik97.droiddeploy.core.exception.ForbiddenAccessException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidApiKeyException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidApiKeyRoleException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidApplicationNameException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidBundleIdException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidCredentialsException
@@ -372,6 +377,76 @@ class GlobalExceptionHandler {
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
             .body(RestResponse.failure(error, "Version upload failed"))
+    }
+
+    @ExceptionHandler(ApiKeyNotFoundException::class)
+    fun handleApiKeyNotFound(ex: ApiKeyNotFoundException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "API key not found exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.NOT_FOUND,
+            message = ex.message ?: "API key not found"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(RestResponse.failure(error, "API key not found"))
+    }
+
+    @ExceptionHandler(InvalidApiKeyException::class)
+    fun handleInvalidApiKey(ex: InvalidApiKeyException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid API key exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHENTICATION,
+            message = ex.message ?: "API key not found or invalid"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.UNAUTHORIZED)
+            .body(RestResponse.failure(error, "Authentication failed"))
+    }
+
+    @ExceptionHandler(ApiKeyRevokedException::class)
+    fun handleApiKeyRevoked(ex: ApiKeyRevokedException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "API key revoked exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHENTICATION,
+            message = ex.message ?: "API key has been revoked"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.UNAUTHORIZED)
+            .body(RestResponse.failure(error, "Authentication failed"))
+    }
+
+    @ExceptionHandler(ApiKeyExpiredException::class)
+    fun handleApiKeyExpired(ex: ApiKeyExpiredException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "API key expired exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.AUTHENTICATION,
+            message = ex.message ?: "API key has expired"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.UNAUTHORIZED)
+            .body(RestResponse.failure(error, "Authentication failed"))
+    }
+
+    @ExceptionHandler(InvalidApiKeyRoleException::class)
+    fun handleInvalidApiKeyRole(ex: InvalidApiKeyRoleException): ResponseEntity<RestResponse<Nothing>> {
+        logger.warn { "Invalid API key role exception: ${ex.message}" }
+
+        val error = RestError(
+            type = RestError.ErrorType.VALIDATION,
+            message = ex.message ?: "Invalid API key role"
+        )
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(RestResponse.failure(error, "API key creation failed"))
     }
 
     @ExceptionHandler(IllegalArgumentException::class)

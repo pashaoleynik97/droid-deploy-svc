@@ -1,5 +1,7 @@
 package com.pashaoleynik97.droiddeploy.rest.controller
 
+import com.pashaoleynik97.droiddeploy.core.dto.auth.ApiKeyLoginRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.auth.ApiTokenDto
 import com.pashaoleynik97.droiddeploy.core.dto.auth.LoginRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.auth.RefreshTokenRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.auth.TokenPairDto
@@ -45,5 +47,18 @@ class AuthController(
         return ResponseEntity
             .status(HttpStatus.OK)
             .body(RestResponse.success(tokenPair, "Token refreshed successfully"))
+    }
+
+    @PostMapping("/apikey")
+    fun loginWithApiKey(@RequestBody request: ApiKeyLoginRequestDto): ResponseEntity<RestResponse<ApiTokenDto>> {
+        logger.info { "POST /api/v1/auth/apikey - API key authentication request received" }
+
+        val apiToken = authService.loginWithApiKey(request)
+
+        logger.info { "API key authentication successful" }
+
+        return ResponseEntity
+            .status(HttpStatus.OK)
+            .body(RestResponse.success(apiToken, "Authentication successful"))
     }
 }

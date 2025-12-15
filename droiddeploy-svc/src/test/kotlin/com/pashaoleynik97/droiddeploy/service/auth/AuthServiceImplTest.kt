@@ -6,9 +6,11 @@ import com.pashaoleynik97.droiddeploy.core.exception.InvalidCredentialsException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
+import com.pashaoleynik97.droiddeploy.core.repository.ApiKeyRepository
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
 import com.pashaoleynik97.droiddeploy.core.dto.auth.LoginRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.auth.RefreshTokenRequestDto
+import com.pashaoleynik97.droiddeploy.security.ApiKeyHashingUtil
 import com.pashaoleynik97.droiddeploy.security.JwtTokenProvider
 import io.jsonwebtoken.Claims
 import org.junit.jupiter.api.Assertions.*
@@ -23,16 +25,20 @@ import java.util.*
 class AuthServiceImplTest {
 
     private lateinit var userRepository: UserRepository
+    private lateinit var apiKeyRepository: ApiKeyRepository
     private lateinit var passwordEncoder: PasswordEncoder
     private lateinit var jwtTokenProvider: JwtTokenProvider
+    private lateinit var hashingUtil: ApiKeyHashingUtil
     private lateinit var authService: AuthServiceImpl
 
     @BeforeEach
     fun setUp() {
         userRepository = mock()
+        apiKeyRepository = mock()
         passwordEncoder = mock()
         jwtTokenProvider = mock()
-        authService = AuthServiceImpl(userRepository, passwordEncoder, jwtTokenProvider)
+        hashingUtil = mock()
+        authService = AuthServiceImpl(userRepository, apiKeyRepository, passwordEncoder, jwtTokenProvider, hashingUtil)
     }
 
     @Test
