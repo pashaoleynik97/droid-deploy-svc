@@ -1,15 +1,22 @@
 package com.pashaoleynik97.droiddeploy.service.auth
 
 import com.pashaoleynik97.droiddeploy.core.domain.UserRole
+import com.pashaoleynik97.droiddeploy.core.exception.ApiKeyExpiredException
+import com.pashaoleynik97.droiddeploy.core.exception.ApiKeyRevokedException
+import com.pashaoleynik97.droiddeploy.core.exception.InvalidApiKeyException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidCredentialsException
 import com.pashaoleynik97.droiddeploy.core.exception.InvalidRefreshTokenException
 import com.pashaoleynik97.droiddeploy.core.exception.UnauthorizedAccessException
 import com.pashaoleynik97.droiddeploy.core.exception.UserNotActiveException
+import com.pashaoleynik97.droiddeploy.core.repository.ApiKeyRepository
 import com.pashaoleynik97.droiddeploy.core.repository.UserRepository
+import com.pashaoleynik97.droiddeploy.core.dto.auth.ApiKeyLoginRequestDto
+import com.pashaoleynik97.droiddeploy.core.dto.auth.ApiTokenDto
 import com.pashaoleynik97.droiddeploy.core.dto.auth.LoginRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.auth.RefreshTokenRequestDto
 import com.pashaoleynik97.droiddeploy.core.dto.auth.TokenPairDto
 import com.pashaoleynik97.droiddeploy.core.service.AuthService
+import com.pashaoleynik97.droiddeploy.security.ApiKeyHashingUtil
 import com.pashaoleynik97.droiddeploy.security.JwtTokenProvider
 import mu.KotlinLogging
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -22,8 +29,10 @@ private val logger = KotlinLogging.logger {}
 @Service
 class AuthServiceImpl(
     private val userRepository: UserRepository,
+    private val apiKeyRepository: ApiKeyRepository,
     private val passwordEncoder: PasswordEncoder,
-    private val jwtTokenProvider: JwtTokenProvider
+    private val jwtTokenProvider: JwtTokenProvider,
+    private val hashingUtil: ApiKeyHashingUtil
 ) : AuthService {
 
     override fun login(request: LoginRequestDto): TokenPairDto {
@@ -143,5 +152,49 @@ class AuthServiceImpl(
             refreshToken = tokenPair.refreshToken,
             refreshTokenExpiresAt = tokenPair.refreshTokenExpiresAt.epochSecond
         )
+    }
+
+    override fun loginWithApiKey(request: ApiKeyLoginRequestDto): ApiTokenDto {
+        logger.info { "API key authentication attempt" }
+
+        // Hash the incoming API key
+        val valueHash = hashingUtil.hashApiKey(request.apiKey)
+
+        // Find API key by hash
+        val apiKey = apiKeyRepository.findByValueHash(valueHash)
+            ?: run {
+                logger.warn { "API key authentication failed: API key not found or invalid" }
+                throw InvalidApiKeyException("API key not found or invalid")
+            }
+
+        // Check if API key is active
+        if (!apiKey.isActive) {
+            logger.warn { "API key authentication failed: API key is revoked (id: ${apiKey.id})" }
+            throw ApiKeyRevokedException("API key has been revoked")
+        }
+
+        // Check if API key is expired
+        val now = Instant.now()
+        val expiresAt = apiKey.expiresAt
+        if (expiresAt != null && now.toEpochMilli() > expiresAt) {
+            logger.warn { "API key authentication failed: API key is expired (id: ${apiKey.id})" }
+            throw ApiKeyExpiredException("API key has expired")
+        }
+
+        // Update last_used_at (best-effort)
+        val updatedApiKey = apiKey.copy(lastUsedAt = now.toEpochMilli())
+        try {
+            apiKeyRepository.save(updatedApiKey)
+        } catch (e: Exception) {
+            logger.warn { "Failed to update last_used_at for API key ${apiKey.id}: ${e.message}" }
+            // Continue anyway - this is best-effort
+        }
+
+        logger.info { "API key authenticated successfully: id=${apiKey.id}, role=${apiKey.role}, applicationId=${apiKey.applicationId}" }
+
+        // Generate JWT access token
+        val accessToken = jwtTokenProvider.generateApiKeyToken(apiKey.applicationId, apiKey.role.name)
+
+        return ApiTokenDto(accessToken = accessToken)
     }
 }

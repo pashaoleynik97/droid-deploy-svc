@@ -178,4 +178,47 @@ class JwtTokenProvider(
     fun getRole(claims: Claims): String? {
         return claims["role"] as? String
     }
+
+    /**
+     * Generate access token for API key authentication
+     */
+    fun generateApiKeyToken(applicationId: UUID, role: String): String {
+        logger.debug { "Generating API key token for application: $applicationId, role: $role" }
+
+        val now = Instant.now()
+        val expiresAt = now.plusSeconds(jwtProperties.accessTokenValiditySeconds)
+
+        val token = Jwts.builder()
+            .subject("apikey:$applicationId")
+            .claim("role", role)
+            .claim("tokenType", "access")
+            .claim("applicationId", applicationId.toString())
+            .issuer(jwtProperties.issuer)
+            .issuedAt(Date.from(now))
+            .expiration(Date.from(expiresAt))
+            .signWith(secretKey)
+            .compact()
+
+        logger.info { "API key token generated successfully for application: $applicationId" }
+
+        return token
+    }
+
+    /**
+     * Extract application ID from token subject (format: "apikey:{applicationId}")
+     */
+    fun extractApplicationId(claims: Claims): UUID? {
+        return try {
+            val subject = claims.subject
+            if (subject.startsWith("apikey:")) {
+                UUID.fromString(subject.substring(7))
+            } else {
+                // Try to get from claim
+                claims["applicationId"]?.let { UUID.fromString(it.toString()) }
+            }
+        } catch (e: Exception) {
+            logger.warn { "Failed to extract application ID from claims: ${e.message}" }
+            null
+        }
+    }
 }
