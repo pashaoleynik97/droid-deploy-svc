@@ -44,25 +44,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: test-results
-          path: |
-            **/build/test-results/test/**/*.xml
-            **/build/reports/tests/test/**
-          retention-days: 7
-
-      - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        if: always()
-        with:
-          files: |
-            **/build/test-results/test/**/*.xml
-          check_name: Test Results
-          comment_mode: off
-
   # Optional: Code quality checks (can be expanded later)
   # code-quality:
   #   name: Code Quality
