@@ -1,6 +1,9 @@
 # Stage 1: Build
 FROM gradle:8.5-jdk21-alpine AS builder
 
+# Accept version as build argument
+ARG VERSION=0.0.0-SNAPSHOT
+
 WORKDIR /build
 
 # Copy Gradle configuration files first for better caching
@@ -22,8 +25,8 @@ COPY droiddeploy-db/src ./droiddeploy-db/src
 COPY droiddeploy-rest/src ./droiddeploy-rest/src
 COPY droiddeploy-svc/src ./droiddeploy-svc/src
 
-# Build the application
-RUN gradle :droiddeploy-svc:bootJar --no-daemon
+# Build the application with specified version
+RUN gradle :droiddeploy-svc:bootJar -Prevision=${VERSION} --no-daemon
 
 # Verify JAR was created
 RUN ls -lh /build/droiddeploy-svc/build/libs/*.jar

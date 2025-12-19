@@ -6,8 +6,12 @@ plugins {
 	id("io.spring.dependency-management") version "1.1.7" apply false
 }
 
+// Dynamic versioning: can be overridden via -Pversion=X.Y.Z
+// Note: Gradle's built-in "version" property takes precedence, so we use a custom property name
+val projectVersion = findProperty("revision")?.toString() ?: "0.0.0-SNAPSHOT"
+
 group = "com.pashaoleynik97"
-version = "0.0.1-SNAPSHOT"
+version = projectVersion
 
 repositories {
 	mavenCentral()
@@ -15,7 +19,7 @@ repositories {
 
 subprojects {
 	group = "com.pashaoleynik97"
-	version = "0.0.1-SNAPSHOT"
+	version = rootProject.version  // Inherit version from root project
 
 	repositories {
 		mavenCentral()
