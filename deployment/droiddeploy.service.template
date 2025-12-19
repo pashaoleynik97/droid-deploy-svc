@@ -1,0 +1,107 @@
+# =============================================================================
+# DroidDeploy Systemd Service Template
+# =============================================================================
+#
+# This is a systemd service unit file template for managing DroidDeploy
+# via systemctl. This enables automatic startup on boot and provides
+# a standard interface for service management.
+#
+# Installation:
+#   1. Copy this file to /etc/systemd/system/droiddeploy.service
+#   2. Replace {{CONFIG_DIR}} with your actual configuration directory
+#   3. Reload systemd: sudo systemctl daemon-reload
+#   4. Enable service: sudo systemctl enable droiddeploy
+#   5. Start service: sudo systemctl start droiddeploy
+#
+# Usage:
+#   sudo systemctl start droiddeploy    # Start the service
+#   sudo systemctl stop droiddeploy     # Stop the service
+#   sudo systemctl restart droiddeploy  # Restart the service
+#   sudo systemctl status droiddeploy   # Check service status
+#   sudo journalctl -u droiddeploy -f   # View logs
+#
+# =============================================================================
+
+[Unit]
+Description=DroidDeploy APK Distribution Service
+Documentation=https://github.com/pashaoleynik97/droid-deploy-svc
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{CONFIG_DIR}}
+
+# Start command
+ExecStart=/usr/bin/docker compose -f {{CONFIG_DIR}}/docker-compose.yml up -d
+
+# Stop command
+ExecStop=/usr/bin/docker compose -f {{CONFIG_DIR}}/docker-compose.yml down
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+
+# Timeout configuration
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+# Security settings
+# Run as root (required for Docker)
+User=root
+Group=root
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=droiddeploy
+
+[Install]
+WantedBy=multi-user.target
+
+# =============================================================================
+# Notes:
+# =============================================================================
+#
+# 1. Configuration Directory:
+#    Replace {{CONFIG_DIR}} with the actual path to your configuration
+#    directory (e.g., /srv/droiddeploy/config)
+#
+# 2. Docker Compose Path:
+#    If docker compose is not in /usr/bin, update the path accordingly.
+#    Find it with: which docker
+#
+# 3. Automatic Startup:
+#    The service will automatically start on system boot if enabled with:
+#    sudo systemctl enable droiddeploy
+#
+# 4. Logs:
+#    View service logs with journalctl:
+#      sudo journalctl -u droiddeploy -f        # Follow logs
+#      sudo journalctl -u droiddeploy --since today
+#
+#    View container logs:
+#      docker compose -f {{CONFIG_DIR}}/docker-compose.yml logs -f
+#
+# 5. Health Monitoring:
+#    Consider adding a health check timer for monitoring:
+#      - Create a separate .timer file for periodic health checks
+#      - Use a companion script to check /actuator/health endpoint
+#
+# 6. Updates:
+#    To update the service after configuration changes:
+#      sudo systemctl daemon-reload
+#      sudo systemctl restart droiddeploy
+#
+# 7. Resource Limits:
+#    You can add resource limits to this service file:
+#
+#    [Service]
+#    MemoryLimit=4G
+#    CPUQuota=200%
+#
+#    Note: These limits apply to systemd, not Docker containers.
+#    For container limits, modify docker-compose.yml instead.
+#
+# =============================================================================

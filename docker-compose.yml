@@ -1,0 +1,115 @@
+version: '3.9'
+
+# =============================================================================
+# DroidDeploy - External Database Mode
+# =============================================================================
+#
+# This compose file deploys DroidDeploy with an external PostgreSQL database.
+# Use this configuration when you have an existing PostgreSQL instance.
+#
+# Prerequisites:
+#   - PostgreSQL 13+ running and accessible
+#   - .env file configured with database connection details
+#   - Docker and Docker Compose installed
+#
+# Usage:
+#   docker-compose up -d
+#   docker-compose logs -f
+#   docker-compose down
+#
+# =============================================================================
+
+services:
+  droiddeploy:
+    image: ghcr.io/pashaoleynik97/droiddeploy:latest
+    container_name: droiddeploy-app
+    restart: unless-stopped
+
+    # Port mapping: host:container
+    # Change the left value to use a different host port
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+
+    # Volume mounts for persistent data
+    volumes:
+      # APK file storage (CRITICAL: must persist across container restarts)
+      - ${DROIDDEPLOY_STORAGE_PATH:-/srv/droiddeploy/apks}:/var/lib/droiddeploy/apks
+
+    # Environment variables from .env file
+    env_file:
+      - .env
+
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # Resource limits (adjust based on your workload)
+    # Uncomment and modify as needed
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2.0'
+    #       memory: 2G
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 512M
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Labels for container management and monitoring
+    labels:
+      com.droiddeploy.service: "app"
+      com.droiddeploy.version: "latest"
+
+# =============================================================================
+# Notes:
+# =============================================================================
+#
+# 1. Environment Variables:
+#    All configuration is loaded from the .env file. See .env.example for
+#    available options.
+#
+# 2. Database Connection:
+#    Ensure your database is accessible from the Docker container.
+#    For local PostgreSQL on the host, use:
+#      - Linux: DB_URL=jdbc:postgresql://172.17.0.1:5432/droiddeploy
+#      - Mac: DB_URL=jdbc:postgresql://host.docker.internal:5432/droiddeploy
+#      - Windows: DB_URL=jdbc:postgresql://host.docker.internal:5432/droiddeploy
+#
+# 3. Storage Path:
+#    The APK storage path can be customized via DROIDDEPLOY_STORAGE_PATH
+#    environment variable. Default: /srv/droiddeploy/apks
+#
+# 4. Backup Strategy:
+#    Regular backups should include:
+#      - Database (use pg_dump or your database backup tool)
+#      - APK files (backup the volume mount directory)
+#
+# 5. Upgrades:
+#    To upgrade to a new version:
+#      docker-compose pull
+#      docker-compose down
+#      docker-compose up -d
+#    Database migrations will run automatically on startup.
+#
+# 6. Security:
+#    - Always use strong passwords in production
+#    - Generate a secure JWT secret (openssl rand -base64 48)
+#    - Consider placing behind a reverse proxy with TLS
+#    - Restrict network access to database
+#
+# 7. Monitoring:
+#    - Health endpoint: http://localhost:8080/actuator/health
+#    - Info endpoint: http://localhost:8080/actuator/info
+#    - View logs: docker-compose logs -f droiddeploy
+#
+# =============================================================================

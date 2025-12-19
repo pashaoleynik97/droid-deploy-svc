@@ -28,7 +28,16 @@ user-defaults:
 
 droiddeploy:
   storage:
-    root: /var/lib/droiddeploy/apks
+    root: ${DROIDDEPLOY_STORAGE_ROOT:/var/lib/droiddeploy/apks}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
 
 security:
   jwt:

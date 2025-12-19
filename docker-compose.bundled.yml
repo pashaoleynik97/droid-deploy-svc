@@ -1,0 +1,223 @@
+version: '3.9'
+
+# =============================================================================
+# DroidDeploy - Bundled Database Mode
+# =============================================================================
+#
+# This compose file deploys DroidDeploy with a bundled PostgreSQL container.
+# Use this configuration for testing, development, or small deployments.
+#
+# For production, consider using an external managed database instead.
+#
+# Prerequisites:
+#   - .env file configured (see .env.example)
+#   - Docker and Docker Compose installed
+#   - Sufficient disk space for database storage
+#
+# Usage:
+#   docker-compose -f docker-compose.bundled.yml up -d
+#   docker-compose -f docker-compose.bundled.yml logs -f
+#   docker-compose -f docker-compose.bundled.yml down
+#
+# =============================================================================
+
+networks:
+  droiddeploy-net:
+    driver: bridge
+    labels:
+      com.droiddeploy.network: "internal"
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  droiddeploy-postgres:
+    image: postgres:15-alpine
+    container_name: droiddeploy-postgres
+    restart: unless-stopped
+
+    # Internal network only (not exposed to host)
+    networks:
+      - droiddeploy-net
+
+    # Environment variables for PostgreSQL initialization
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-droiddeploy}
+      POSTGRES_USER: ${POSTGRES_USER:-droiddeploy_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env file}
+      # Performance tuning for small deployments
+      POSTGRES_SHARED_BUFFERS: ${POSTGRES_SHARED_BUFFERS:-256MB}
+      POSTGRES_MAX_CONNECTIONS: ${POSTGRES_MAX_CONNECTIONS:-100}
+
+    # Volume for persistent database storage
+    volumes:
+      - ${POSTGRES_DATA_PATH:-/srv/droiddeploy/pgdata}:/var/lib/postgresql/data
+
+    # Health check to ensure database is ready before starting app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-droiddeploy_user} -d ${POSTGRES_DB:-droiddeploy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    # Resource limits for database
+    # Adjust based on your workload
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 1G
+    #     reservations:
+    #       cpus: '0.25'
+    #       memory: 256M
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Labels for container management
+    labels:
+      com.droiddeploy.service: "database"
+      com.droiddeploy.version: "postgres-15"
+
+  # ---------------------------------------------------------------------------
+  # DroidDeploy Application
+  # ---------------------------------------------------------------------------
+  droiddeploy:
+    image: ghcr.io/pashaoleynik97/droiddeploy:latest
+    container_name: droiddeploy-app
+    restart: unless-stopped
+
+    # Wait for database to be healthy before starting
+    depends_on:
+      droiddeploy-postgres:
+        condition: service_healthy
+
+    # Connect to internal network and expose port to host
+    networks:
+      - droiddeploy-net
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+
+    # Volume mounts for persistent data
+    volumes:
+      # APK file storage (CRITICAL: must persist across container restarts)
+      - ${DROIDDEPLOY_STORAGE_PATH:-/srv/droiddeploy/apks}:/var/lib/droiddeploy/apks
+
+    # Environment variables from .env file
+    env_file:
+      - .env
+
+    # Override DB_URL to use the bundled PostgreSQL container
+    environment:
+      # Use the service name as hostname (Docker internal DNS)
+      DB_URL: jdbc:postgresql://droiddeploy-postgres:5432/${POSTGRES_DB:-droiddeploy}
+
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # Resource limits (adjust based on your workload)
+    # Uncomment and modify as needed
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2.0'
+    #       memory: 2G
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 512M
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Labels for container management and monitoring
+    labels:
+      com.droiddeploy.service: "app"
+      com.droiddeploy.version: "latest"
+
+# =============================================================================
+# Notes:
+# =============================================================================
+#
+# 1. Environment Variables:
+#    All configuration is loaded from the .env file. See .env.example for
+#    available options. Key variables for bundled mode:
+#      - POSTGRES_DB: Database name
+#      - POSTGRES_USER: Database username (should match DB_USERNAME)
+#      - POSTGRES_PASSWORD: Database password (should match DB_PASSWORD)
+#      - DB_USERNAME: Application database username
+#      - DB_PASSWORD: Application database password
+#
+#    Note: DB_URL is automatically set to use the bundled PostgreSQL container.
+#
+# 2. Storage Paths:
+#    Two persistent volumes are created:
+#      - APK files: ${DROIDDEPLOY_STORAGE_PATH:-/srv/droiddeploy/apks}
+#      - Database: ${POSTGRES_DATA_PATH:-/srv/droiddeploy/pgdata}
+#
+#    Ensure these directories are backed up regularly!
+#
+# 3. Networking:
+#    - Internal network (droiddeploy-net) connects app and database
+#    - Only the application port (8080) is exposed to the host
+#    - Database is not accessible from outside the Docker network
+#
+# 4. Startup Order:
+#    1. PostgreSQL container starts
+#    2. Health check waits for PostgreSQL to be ready
+#    3. Application container starts
+#    4. Flyway migrations run automatically
+#    5. Application becomes ready
+#
+# 5. Backup Strategy:
+#    Regular backups should include:
+#      - Database: Backup /srv/droiddeploy/pgdata or use pg_dump
+#        docker exec droiddeploy-postgres pg_dump -U droiddeploy_user droiddeploy > backup.sql
+#      - APK files: Backup /srv/droiddeploy/apks directory
+#
+# 6. Restore from Backup:
+#    Database restore:
+#      docker exec -i droiddeploy-postgres psql -U droiddeploy_user droiddeploy < backup.sql
+#    APK files: Copy files back to /srv/droiddeploy/apks
+#
+# 7. Upgrades:
+#    To upgrade to a new version:
+#      docker-compose -f docker-compose.bundled.yml pull droiddeploy
+#      docker-compose -f docker-compose.bundled.yml down
+#      docker-compose -f docker-compose.bundled.yml up -d
+#    Database migrations will run automatically on startup.
+#
+# 8. Security:
+#    - Always use strong passwords (POSTGRES_PASSWORD, DB_PASSWORD)
+#    - Generate a secure JWT secret (openssl rand -base64 48)
+#    - Consider placing behind a reverse proxy with TLS
+#    - Database is isolated to internal network (good security practice)
+#
+# 9. Monitoring:
+#    - App health: http://localhost:8080/actuator/health
+#    - App info: http://localhost:8080/actuator/info
+#    - App logs: docker-compose -f docker-compose.bundled.yml logs -f droiddeploy
+#    - DB logs: docker-compose -f docker-compose.bundled.yml logs -f droiddeploy-postgres
+#    - Both: docker-compose -f docker-compose.bundled.yml logs -f
+#
+# 10. Troubleshooting:
+#     - Database not ready: Check droiddeploy-postgres health
+#       docker-compose -f docker-compose.bundled.yml ps
+#     - Connection refused: Ensure DB_URL uses 'droiddeploy-postgres' as hostname
+#     - Migrations fail: Check database logs for errors
+#     - App crashes: Check if POSTGRES_PASSWORD and DB_PASSWORD match
+#
+# =============================================================================
