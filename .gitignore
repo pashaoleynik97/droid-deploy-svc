@@ -38,3 +38,17 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### Deployment ###
+# Environment files (contain secrets)
+.env
+.env.*
+*.env
+
+# Deployment data directories
+/apks/
+/pgdata/
+/backups/
+
+# Deployment-specific configs (if generated locally)
+docker-compose.override.yml

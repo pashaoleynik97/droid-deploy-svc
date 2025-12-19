@@ -1,0 +1,89 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+*.iml
+*.ipr
+*.iws
+.vscode
+.settings
+.classpath
+.project
+
+# Build outputs
+build
+**/build/
+target
+**/target/
+out
+**/out/
+
+# Gradle
+.gradle
+**/. gradle/
+gradle-wrapper.jar
+
+# Temporary files
+.tmp_notes
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation (except essential)
+*.md
+!README.md
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Logs
+*.log
+logs/
+**/logs/
+
+# Test reports
+**/test-results/
+**/reports/
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Deployment scripts
+install-*.sh
+upgrade-*.sh
+deployment/
+
+# Package manager
+node_modules
+npm-debug.log
+yarn-error.log
+
+# OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Kotlin
+*.kotlin_module
+.kotlin
+
+# Application specific
+apks/
+pgdata/
