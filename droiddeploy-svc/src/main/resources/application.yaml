@@ -39,6 +39,17 @@ management:
     health:
       show-details: when-authorized
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+  show-actuator: false
+
 security:
   jwt:
     secret: ${JWT_SECRET:change-me-in-real-env-this-should-be-at-least-256-bits-long}
