@@ -38,6 +38,7 @@ class SecurityConfig(
             .authorizeHttpRequests { auth ->
                 auth
                     .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()  // Allow anonymous access to auth endpoints
+                    .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()  // Allow anonymous access to API documentation
                     .anyRequest().authenticated()  // All other endpoints require authentication
             }
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)  // Add JWT filter
