@@ -90,6 +90,7 @@ services:
   droiddeploy:
     image: ghcr.io/pashaoleynik97/droiddeploy:latest
     container_name: droiddeploy-app
+    platform: linux/amd64  # Use AMD64 emulation on ARM Macs
     restart: unless-stopped
 
     # Wait for database to be healthy before starting
