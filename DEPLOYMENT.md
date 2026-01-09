@@ -70,7 +70,7 @@ The automated installer handles all setup steps interactively.
 
 ```bash
 # Download from repository
-curl -fsSL https://raw.githubusercontent.com/pashaoleynik97/droid-deploy-svc/main/install-droiddeploy.sh -o install-droiddeploy.sh
+curl -fsSL https://raw.githubusercontent.com/pashaoleynik97/droid-deploy-svc/master/install-droiddeploy.sh -o install-droiddeploy.sh
 
 # Make executable
 chmod +x install-droiddeploy.sh

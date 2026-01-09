@@ -93,7 +93,7 @@ check_docker() {
     fi
 
     local docker_version
-    docker_version=$(docker --version | grep -oP '\d+\.\d+' | head -1)
+    docker_version=$(docker --version | sed -E 's/.*version ([0-9]+\.[0-9]+).*/\1/')
 
     if ! version_gte "$docker_version" "$DOCKER_MIN_VERSION"; then
         print_error "Docker version $docker_version is too old (minimum: $DOCKER_MIN_VERSION)"
@@ -112,7 +112,7 @@ check_docker_compose() {
     fi
 
     local compose_version
-    compose_version=$(docker compose version --short | grep -oP '\d+\.\d+' | head -1)
+    compose_version=$(docker compose version 2>/dev/null | sed -E 's/.*version (v)?([0-9]+\.[0-9]+).*/\2/' | head -1)
 
     if ! version_gte "$compose_version" "$COMPOSE_MIN_VERSION"; then
         print_error "Docker Compose version $compose_version is too old (minimum: $COMPOSE_MIN_VERSION)"
@@ -130,7 +130,8 @@ version_gte() {
 # Check disk space
 check_disk_space() {
     local available_gb
-    available_gb=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
+    # Use awk to calculate GB from 512-byte blocks (portable across Linux and macOS)
+    available_gb=$(df / | tail -1 | awk '{printf "%.0f", $4/1024/1024}')
 
     if [[ $available_gb -lt $MIN_DISK_SPACE_GB ]]; then
         print_error "Insufficient disk space (available: ${available_gb}GB, required: ${MIN_DISK_SPACE_GB}GB)"
