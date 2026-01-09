@@ -36,7 +36,7 @@ DroidDeploy is a Spring Boot-based service for managing and distributing Android
 
 ```bash
 # Download installer
-curl -fsSL https://raw.githubusercontent.com/pashaoleynik97/droid-deploy-svc/main/install-droiddeploy.sh -o install-droiddeploy.sh
+curl -fsSL https://raw.githubusercontent.com/pashaoleynik97/droid-deploy-svc/master/install-droiddeploy.sh -o install-droiddeploy.sh
 chmod +x install-droiddeploy.sh
 
 # Run installer (interactive)
