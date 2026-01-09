@@ -3,7 +3,7 @@
 ## Key Technical Details
 
 ### Project Structure
-- **Build System:** Gradle 8.5+ with Kotlin DSL
+- **Build System:** Gradle 8.14+ with Kotlin DSL
 - **Java Version:** 21 (Eclipse Temurin)
 - **Spring Boot:** 4.0.0
 - **Main Module:** droiddeploy-svc (produces bootJar)
