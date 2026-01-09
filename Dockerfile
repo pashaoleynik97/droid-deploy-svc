@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM gradle:8.5-jdk21-alpine AS builder
+FROM gradle:8.14-jdk21-alpine AS builder
 
 # Accept version as build argument
 ARG VERSION=0.0.0-SNAPSHOT
