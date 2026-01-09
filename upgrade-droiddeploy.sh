@@ -16,8 +16,26 @@ set -u  # Exit on undefined variable
 # -----------------------------------------------------------------------------
 
 VERSION="1.0.0"
-DEFAULT_CONFIG_DIR="/srv/droiddeploy/config"
-BACKUP_DIR_BASE="/srv/droiddeploy/backups"
+
+# Detect OS and set appropriate defaults
+OS_TYPE="$(uname -s)"
+case "$OS_TYPE" in
+    Darwin*)
+        # macOS: /srv is read-only, use /opt instead
+        DEFAULT_INSTALL_DIR="/opt/droiddeploy"
+        ;;
+    Linux*)
+        # Linux: use traditional /srv directory
+        DEFAULT_INSTALL_DIR="/srv/droiddeploy"
+        ;;
+    *)
+        # Other Unix-like systems: use /opt as fallback
+        DEFAULT_INSTALL_DIR="/opt/droiddeploy"
+        ;;
+esac
+
+DEFAULT_CONFIG_DIR="${DEFAULT_INSTALL_DIR}/config"
+BACKUP_DIR_BASE="${DEFAULT_INSTALL_DIR}/backups"
 
 # Colors for output
 RED='\033[0;31m'
@@ -248,8 +266,9 @@ pull_new_image() {
 
     # Update image reference if not using 'latest'
     if [[ "$TARGET_VERSION" != "latest" ]]; then
-        # Update docker-compose.yml to use specific version
-        sed -i.bak "s|image: ghcr.io/pashaoleynik97/droiddeploy:.*|image: ghcr.io/pashaoleynik97/droiddeploy:${TARGET_VERSION}|" docker-compose.yml
+        # Update docker-compose.yml to use specific version (portable sed syntax)
+        cp docker-compose.yml docker-compose.yml.bak
+        sed "s|image: ghcr.io/pashaoleynik97/droiddeploy:.*|image: ghcr.io/pashaoleynik97/droiddeploy:${TARGET_VERSION}|" docker-compose.yml.bak > docker-compose.yml
     fi
 
     if docker compose pull droiddeploy; then

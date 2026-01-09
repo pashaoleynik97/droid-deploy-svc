@@ -20,8 +20,24 @@ DOCKER_MIN_VERSION="20.10"
 COMPOSE_MIN_VERSION="2.0"
 MIN_DISK_SPACE_GB=5
 
-# Default values
-DEFAULT_INSTALL_DIR="/srv/droiddeploy"
+# Detect OS and set appropriate defaults
+OS_TYPE="$(uname -s)"
+case "$OS_TYPE" in
+    Darwin*)
+        # macOS: /srv is read-only, use /opt instead
+        DEFAULT_INSTALL_DIR="/opt/droiddeploy"
+        ;;
+    Linux*)
+        # Linux: use traditional /srv directory
+        DEFAULT_INSTALL_DIR="/srv/droiddeploy"
+        ;;
+    *)
+        # Other Unix-like systems: use /opt as fallback
+        DEFAULT_INSTALL_DIR="/opt/droiddeploy"
+        ;;
+esac
+
+# Derived default paths
 DEFAULT_CONFIG_DIR="${DEFAULT_INSTALL_DIR}/config"
 DEFAULT_APK_STORAGE_DIR="${DEFAULT_INSTALL_DIR}/apks"
 DEFAULT_PGDATA_DIR="${DEFAULT_INSTALL_DIR}/pgdata"
@@ -258,6 +274,20 @@ confirm() {
 run_preflight_checks() {
     print_section "Pre-flight Checks"
 
+    # Show detected OS
+    case "$OS_TYPE" in
+        Darwin*)
+            print_info "Detected macOS - using /opt for installation"
+            ;;
+        Linux*)
+            print_info "Detected Linux - using /srv for installation"
+            ;;
+        *)
+            print_info "Detected $OS_TYPE - using /opt for installation"
+            ;;
+    esac
+    echo ""
+
     check_root
     check_docker
     check_docker_compose
@@ -331,7 +361,7 @@ configure_bundled_database() {
     DB_PASSWORD=$(generate_secret | cut -c1-32)  # 32 char password
     DB_URL="jdbc:postgresql://droiddeploy-postgres:5432/${DB_NAME}"
 
-    prompt "  Database storage path" "$DEFAULT_PGDATA_DIR" PGDATA_DIR
+    prompt "  Database storage path" "$PGDATA_DIR" PGDATA_DIR
 
     print_warning "Remember to backup this directory regularly: $PGDATA_DIR"
 }
@@ -373,13 +403,30 @@ configure_security() {
     print_success "JWT secret generated"
 }
 
+configure_installation_path() {
+    print_section "Installation Path"
+
+    echo "Choose installation directory for DroidDeploy."
+    echo "All configuration and data will be stored under this path."
+    echo ""
+
+    prompt "  Installation directory" "$DEFAULT_INSTALL_DIR" INSTALL_DIR
+
+    # Update all derived paths
+    CONFIG_DIR="${INSTALL_DIR}/config"
+    APK_STORAGE_DIR="${INSTALL_DIR}/apks"
+    PGDATA_DIR="${INSTALL_DIR}/pgdata"
+
+    print_success "Installation directory set to: $INSTALL_DIR"
+}
+
 configure_storage() {
     print_section "Storage Configuration"
 
     echo "Where should APK files be stored?"
     echo ""
 
-    prompt "  Storage path" "$DEFAULT_APK_STORAGE_DIR" APK_STORAGE_DIR
+    prompt "  Storage path" "$APK_STORAGE_DIR" APK_STORAGE_DIR
 
     print_success "APK files will be stored at: $APK_STORAGE_DIR"
 }
@@ -410,6 +457,7 @@ show_summary() {
     print_section "Installation Summary"
 
     echo "Configuration summary:"
+    echo "  • Installation directory: $INSTALL_DIR"
     echo "  • Database mode: $( [[ "$DB_MODE" == "bundled" ]] && echo "Bundled PostgreSQL container" || echo "External PostgreSQL" )"
     echo "  • Admin username: $ADMIN_USERNAME"
     echo "  • Storage path: $APK_STORAGE_DIR"
@@ -429,11 +477,25 @@ show_summary() {
 create_directories() {
     print_info "Creating directories..."
 
-    mkdir -p "$CONFIG_DIR"
-    mkdir -p "$APK_STORAGE_DIR"
+    # Create directories with error handling
+    if ! mkdir -p "$CONFIG_DIR" 2>/dev/null; then
+        print_error "Failed to create directory: $CONFIG_DIR"
+        print_info "Please ensure you have write permissions or choose a different path"
+        exit 1
+    fi
+
+    if ! mkdir -p "$APK_STORAGE_DIR" 2>/dev/null; then
+        print_error "Failed to create directory: $APK_STORAGE_DIR"
+        print_info "Please ensure you have write permissions or choose a different path"
+        exit 1
+    fi
 
     if [[ "$DB_MODE" == "bundled" ]]; then
-        mkdir -p "$PGDATA_DIR"
+        if ! mkdir -p "$PGDATA_DIR" 2>/dev/null; then
+            print_error "Failed to create directory: $PGDATA_DIR"
+            print_info "Please ensure you have write permissions or choose a different path"
+            exit 1
+        fi
     fi
 
     # Set permissions
@@ -444,7 +506,7 @@ create_directories() {
         chmod 700 "$PGDATA_DIR"  # More restrictive for database
     fi
 
-    print_success "Directories created"
+    print_success "Directories created successfully"
 }
 
 generate_env_file() {
@@ -610,6 +672,7 @@ main() {
     print_header
 
     # Set default values
+    INSTALL_DIR="$DEFAULT_INSTALL_DIR"
     CONFIG_DIR="$DEFAULT_CONFIG_DIR"
     APK_STORAGE_DIR="$DEFAULT_APK_STORAGE_DIR"
     PGDATA_DIR="$DEFAULT_PGDATA_DIR"
@@ -617,6 +680,7 @@ main() {
 
     # Run installation steps
     run_preflight_checks
+    configure_installation_path
     configure_database
     configure_security
     configure_storage
