@@ -479,6 +479,17 @@ show_summary() {
 create_directories() {
     print_info "Creating directories..."
 
+    # Get the actual user (not root when using sudo)
+    local actual_user="${SUDO_USER:-$USER}"
+    local actual_group
+
+    # Determine group based on OS
+    if [[ "$OS_TYPE" == "Darwin"* ]]; then
+        actual_group="staff"  # Default macOS group
+    else
+        actual_group="${actual_user}"  # Linux typically uses username as group
+    fi
+
     # Create directories with error handling
     if ! mkdir -p "$CONFIG_DIR" 2>/dev/null; then
         print_error "Failed to create directory: $CONFIG_DIR"
@@ -500,12 +511,24 @@ create_directories() {
         fi
     fi
 
-    # Set permissions
+    # Set permissions and ownership
+    # On macOS with Docker Desktop, directories should be owned by the user, not root
     chmod 755 "$CONFIG_DIR"
     chmod 755 "$APK_STORAGE_DIR"
 
+    if [[ "$OS_TYPE" == "Darwin"* ]]; then
+        # macOS: Change ownership to actual user for Docker Desktop compatibility
+        chown -R "${actual_user}:${actual_group}" "$INSTALL_DIR"
+        # Config dir can stay root-owned for security
+        chown root:wheel "$CONFIG_DIR"
+    fi
+
     if [[ "$DB_MODE" == "bundled" ]]; then
-        chmod 700 "$PGDATA_DIR"  # More restrictive for database
+        chmod 755 "$PGDATA_DIR"  # Changed from 700 for Docker Desktop compatibility
+        if [[ "$OS_TYPE" == "Darwin"* ]]; then
+            # Ensure pgdata is accessible by Docker Desktop
+            chown "${actual_user}:${actual_group}" "$PGDATA_DIR"
+        fi
     fi
 
     print_success "Directories created successfully"
