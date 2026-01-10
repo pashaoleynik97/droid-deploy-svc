@@ -272,10 +272,20 @@ pull_new_image() {
         sed "s|image: ghcr.io/pashaoleynik97/droiddeploy:.*|image: ghcr.io/pashaoleynik97/droiddeploy:${TARGET_VERSION}|" docker-compose.yml.bak > docker-compose.yml
     fi
 
-    if docker compose pull droiddeploy; then
+    # Try docker compose pull first
+    if docker compose pull droiddeploy 2>/dev/null; then
         print_success "New image pulled successfully"
+        return 0
+    fi
+
+    # Fallback: Pull image directly (workaround for credential helper issues)
+    print_warning "docker compose pull failed, trying direct pull..."
+
+    local image_tag="ghcr.io/pashaoleynik97/droiddeploy:${TARGET_VERSION}"
+    if docker pull "$image_tag"; then
+        print_success "New image pulled successfully: $image_tag"
     else
-        print_error "Failed to pull new image"
+        print_error "Failed to pull new image: $image_tag"
         exit 1
     fi
 }
