@@ -580,12 +580,34 @@ pull_images() {
 
     cd "$CONFIG_DIR"
 
-    if docker compose pull; then
+    # Try docker compose pull first
+    if docker compose pull 2>/dev/null; then
         print_success "Docker images pulled successfully"
+        return 0
+    fi
+
+    # Fallback: Pull images directly (workaround for credential helper issues)
+    print_warning "docker compose pull failed, trying direct pull..."
+
+    # Pull application image
+    if docker pull "$DOCKER_IMAGE"; then
+        print_success "Application image pulled: $DOCKER_IMAGE"
     else
-        print_error "Failed to pull Docker images"
+        print_error "Failed to pull application image: $DOCKER_IMAGE"
         exit 1
     fi
+
+    # Pull PostgreSQL image if bundled mode
+    if [[ "$DB_MODE" == "bundled" ]]; then
+        if docker pull postgres:15-alpine; then
+            print_success "PostgreSQL image pulled: postgres:15-alpine"
+        else
+            print_error "Failed to pull PostgreSQL image"
+            exit 1
+        fi
+    fi
+
+    print_success "All images pulled successfully"
 }
 
 start_services() {
