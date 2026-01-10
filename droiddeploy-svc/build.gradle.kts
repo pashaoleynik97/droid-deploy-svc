@@ -18,6 +18,9 @@ dependencies {
     // Kotlin logging
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
 
+    // APK parsing
+    implementation("net.dongliu:apk-parser:2.6.10")
+
     // JWT
     implementation("io.jsonwebtoken:jjwt-api:0.12.5")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
