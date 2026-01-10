@@ -1,6 +1,10 @@
 spring:
   application:
     name: droiddeploy
+  servlet:
+    multipart:
+      max-file-size: 300MB      # Max file size
+      max-request-size: 300MB   # Max request size
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/droiddeploy}
