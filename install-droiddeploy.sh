@@ -24,8 +24,9 @@ MIN_DISK_SPACE_GB=5
 OS_TYPE="$(uname -s)"
 case "$OS_TYPE" in
     Darwin*)
-        # macOS: /srv is read-only, use /opt instead
-        DEFAULT_INSTALL_DIR="/opt/droiddeploy"
+        # macOS: Use /Users/Shared (Docker Desktop file sharing compatible)
+        # /srv is read-only, /opt requires Docker Desktop configuration
+        DEFAULT_INSTALL_DIR="/Users/Shared/droiddeploy"
         ;;
     Linux*)
         # Linux: use traditional /srv directory
@@ -277,7 +278,8 @@ run_preflight_checks() {
     # Show detected OS
     case "$OS_TYPE" in
         Darwin*)
-            print_info "Detected macOS - using /opt for installation"
+            print_info "Detected macOS - using /Users/Shared for installation"
+            print_info "(Docker Desktop file sharing compatible)"
             ;;
         Linux*)
             print_info "Detected Linux - using /srv for installation"
