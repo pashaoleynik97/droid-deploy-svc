@@ -1,0 +1,19 @@
+Quick fix - the database has old credentials. Wipe and restart:
+
+  # Stop containers and remove volumes
+  docker compose -f /Users/Shared/droiddeploy/config/docker-compose.yml down -v
+
+  # Remove and recreate pgdata directory
+  rm -rf /Users/Shared/droiddeploy/pgdata
+  mkdir -p /Users/Shared/droiddeploy/pgdata
+  chmod 755 /Users/Shared/droiddeploy/pgdata
+
+  # Start with fresh database
+  cd /Users/Shared/droiddeploy/config
+  docker compose up -d
+
+  # Wait for startup
+  sleep 15
+
+  # Check logs
+  docker compose logs droiddeploy --tail=20

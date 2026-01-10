@@ -1,19 +1,18 @@
 package com.pashaoleynik97.droiddeploy.service.application
 
 import mu.KotlinLogging
+import net.dongliu.apk.parser.ByteArrayApkFile
 import org.springframework.stereotype.Component
-import java.io.ByteArrayInputStream
 import java.security.MessageDigest
-import java.security.cert.CertificateFactory
-import java.util.zip.ZipInputStream
 
 private val logger = KotlinLogging.logger {}
 
 /**
- * Basic implementation of ApkMetadataExtractor.
+ * Implementation of ApkMetadataExtractor using apk-parser library.
  *
- * TODO: Implement full APK parsing using a library like apk-parser or similar.
- * For now, this is a placeholder implementation that can be mocked in tests.
+ * This extracts:
+ * 1. versionCode and versionName from AndroidManifest.xml
+ * 2. Signing certificate SHA-256 fingerprint from META-INF/
  */
 @Component
 class ApkMetadataExtractorImpl : ApkMetadataExtractor {
@@ -21,62 +20,58 @@ class ApkMetadataExtractorImpl : ApkMetadataExtractor {
     override fun extractMetadata(apkContent: ByteArray): ApkMetadata {
         logger.debug { "Extracting metadata from APK file (${apkContent.size} bytes)" }
 
-        // TODO: Implement real APK parsing
-        // For now, this is a basic implementation that:
-        // 1. Reads AndroidManifest.xml (requires proper binary XML parsing)
-        // 2. Extracts signing certificate from META-INF/
-        // 3. Computes SHA256 fingerprint
+        return try {
+            ByteArrayApkFile(apkContent).use { apkFile ->
+                // Extract version info from AndroidManifest.xml
+                val apkMeta = apkFile.apkMeta
+                val versionCode = apkMeta.versionCode.toInt()
+                val versionName = apkMeta.versionName ?: "unknown"
 
-        // Placeholder: Extract signing certificate from APK
-        val signingCertificateSha256 = extractSigningCertificateSha256(apkContent)
+                logger.trace { "Extracted version: $versionName ($versionCode)" }
 
-        // TODO: Parse AndroidManifest.xml to extract versionCode and versionName
-        // This requires proper binary XML parsing (AndroidManifest.xml is in binary format)
+                // Extract signing certificate SHA-256 fingerprint using apk-parser library
+                // If APK is unsigned, use a placeholder value (for testing/debugging APKs)
+                val signingCertificateSha256 = try {
+                    extractSigningCertificateSha256(apkFile)
+                } catch (e: Exception) {
+                    logger.warn { "Failed to extract signing certificate (APK may be unsigned): ${e.message}" }
+                    // Return placeholder for unsigned/debug APKs
+                    "0".repeat(64) // 64 zeros as placeholder SHA-256
+                }
 
-        throw UnsupportedOperationException(
-            "APK metadata extraction not yet fully implemented. " +
-            "Please provide an implementation or use mocking in tests."
-        )
+                logger.debug { "Successfully extracted APK metadata" }
+
+                ApkMetadata(
+                    versionCode = versionCode,
+                    versionName = versionName,
+                    signingCertificateSha256 = signingCertificateSha256
+                )
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to extract APK metadata" }
+            throw IllegalArgumentException("Failed to parse APK file: ${e.message}", e)
+        }
     }
 
-    private fun extractSigningCertificateSha256(apkContent: ByteArray): String {
-        // APK files are ZIP archives
-        // Signing certificates are typically in META-INF/*.RSA or META-INF/*.DSA
+    private fun extractSigningCertificateSha256(apkFile: ByteArrayApkFile): String {
+        // Try to get certificate info from the APK (supports both v1 and v2/v3 signing schemes)
+        @Suppress("DEPRECATION")
+        val certificates = apkFile.certificateMetaList
 
-        ZipInputStream(ByteArrayInputStream(apkContent)).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                val entryName = entry.name
-                if (entryName.startsWith("META-INF/") &&
-                    (entryName.endsWith(".RSA") || entryName.endsWith(".DSA") || entryName.endsWith(".EC"))) {
-
-                    logger.trace { "Found signing certificate entry: $entryName" }
-
-                    // Read the certificate
-                    val certBytes = zip.readBytes()
-
-                    // Parse PKCS7 signature block to extract certificate
-                    // This is simplified - real implementation would properly parse PKCS7
-                    val certificateFactory = CertificateFactory.getInstance("X.509")
-
-                    try {
-                        // Try to extract the certificate from the signature block
-                        // Note: This is a simplified approach and may not work for all APKs
-                        val cert = certificateFactory.generateCertificate(ByteArrayInputStream(certBytes))
-
-                        // Compute SHA256 fingerprint
-                        val sha256 = MessageDigest.getInstance("SHA-256")
-                        val fingerprint = sha256.digest(cert.encoded)
-
-                        return fingerprint.joinToString("") { "%02X".format(it) }
-                    } catch (e: Exception) {
-                        logger.warn { "Failed to parse certificate from $entryName: ${e.message}" }
-                    }
-                }
-                entry = zip.nextEntry
-            }
+        if (certificates.isNullOrEmpty()) {
+            throw IllegalArgumentException("No signing certificates found in APK")
         }
 
-        throw IllegalArgumentException("No signing certificate found in APK")
+        // Get the first certificate (signer certificate)
+        val certMeta = certificates.first()
+
+        // Get the raw certificate data
+        val certData = certMeta.data
+
+        // Compute SHA256 fingerprint
+        val sha256 = MessageDigest.getInstance("SHA-256")
+        val fingerprint = sha256.digest(certData)
+
+        return fingerprint.joinToString("") { "%02X".format(it) }
     }
 }
