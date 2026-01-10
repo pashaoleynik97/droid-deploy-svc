@@ -79,14 +79,7 @@ class JwtAuthenticationFilter(
             return
         }
 
-        // Extract user ID
-        val userId = jwtTokenProvider.extractUserId(claims)
-        if (userId == null) {
-            logger.warn { "Failed to extract user ID from token" }
-            return
-        }
-
-        // Extract role
+        // Extract role first (required for all token types)
         val roleString = jwtTokenProvider.getRole(claims)
         if (roleString == null) {
             logger.warn { "Failed to extract role from token" }
@@ -100,10 +93,19 @@ class JwtAuthenticationFilter(
             return
         }
 
+        // Try to extract user ID (for user tokens) or application ID (for API key tokens)
+        val userId = jwtTokenProvider.extractUserId(claims)
+            ?: jwtTokenProvider.extractApplicationId(claims)
+
+        if (userId == null) {
+            logger.warn { "Failed to extract user ID or application ID from token" }
+            return
+        }
+
         // Create and set authentication
         val authentication = JwtAuthentication(userId, userRole)
         SecurityContextHolder.getContext().authentication = authentication
 
-        logger.debug { "JWT authentication successful for user: $userId, role: $userRole" }
+        logger.debug { "JWT authentication successful for subject: $userId, role: $userRole" }
     }
 }
