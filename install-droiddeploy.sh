@@ -24,8 +24,9 @@ MIN_DISK_SPACE_GB=5
 OS_TYPE="$(uname -s)"
 case "$OS_TYPE" in
     Darwin*)
-        # macOS: /srv is read-only, use /opt instead
-        DEFAULT_INSTALL_DIR="/opt/droiddeploy"
+        # macOS: Use /Users/Shared (Docker Desktop file sharing compatible)
+        # /srv is read-only, /opt requires Docker Desktop configuration
+        DEFAULT_INSTALL_DIR="/Users/Shared/droiddeploy"
         ;;
     Linux*)
         # Linux: use traditional /srv directory
@@ -277,7 +278,8 @@ run_preflight_checks() {
     # Show detected OS
     case "$OS_TYPE" in
         Darwin*)
-            print_info "Detected macOS - using /opt for installation"
+            print_info "Detected macOS - using /Users/Shared for installation"
+            print_info "(Docker Desktop file sharing compatible)"
             ;;
         Linux*)
             print_info "Detected Linux - using /srv for installation"
@@ -477,6 +479,17 @@ show_summary() {
 create_directories() {
     print_info "Creating directories..."
 
+    # Get the actual user (not root when using sudo)
+    local actual_user="${SUDO_USER:-$USER}"
+    local actual_group
+
+    # Determine group based on OS
+    if [[ "$OS_TYPE" == "Darwin"* ]]; then
+        actual_group="staff"  # Default macOS group
+    else
+        actual_group="${actual_user}"  # Linux typically uses username as group
+    fi
+
     # Create directories with error handling
     if ! mkdir -p "$CONFIG_DIR" 2>/dev/null; then
         print_error "Failed to create directory: $CONFIG_DIR"
@@ -498,12 +511,24 @@ create_directories() {
         fi
     fi
 
-    # Set permissions
+    # Set permissions and ownership
+    # On macOS with Docker Desktop, directories should be owned by the user, not root
     chmod 755 "$CONFIG_DIR"
     chmod 755 "$APK_STORAGE_DIR"
 
+    if [[ "$OS_TYPE" == "Darwin"* ]]; then
+        # macOS: Change ownership to actual user for Docker Desktop compatibility
+        chown -R "${actual_user}:${actual_group}" "$INSTALL_DIR"
+        # Config dir can stay root-owned for security
+        chown root:wheel "$CONFIG_DIR"
+    fi
+
     if [[ "$DB_MODE" == "bundled" ]]; then
-        chmod 700 "$PGDATA_DIR"  # More restrictive for database
+        chmod 755 "$PGDATA_DIR"  # Changed from 700 for Docker Desktop compatibility
+        if [[ "$OS_TYPE" == "Darwin"* ]]; then
+            # Ensure pgdata is accessible by Docker Desktop
+            chown "${actual_user}:${actual_group}" "$PGDATA_DIR"
+        fi
     fi
 
     print_success "Directories created successfully"
@@ -580,12 +605,34 @@ pull_images() {
 
     cd "$CONFIG_DIR"
 
-    if docker compose pull; then
+    # Try docker compose pull first
+    if docker compose pull 2>/dev/null; then
         print_success "Docker images pulled successfully"
+        return 0
+    fi
+
+    # Fallback: Pull images directly (workaround for credential helper issues)
+    print_warning "docker compose pull failed, trying direct pull..."
+
+    # Pull application image
+    if docker pull "$DOCKER_IMAGE"; then
+        print_success "Application image pulled: $DOCKER_IMAGE"
     else
-        print_error "Failed to pull Docker images"
+        print_error "Failed to pull application image: $DOCKER_IMAGE"
         exit 1
     fi
+
+    # Pull PostgreSQL image if bundled mode
+    if [[ "$DB_MODE" == "bundled" ]]; then
+        if docker pull postgres:15-alpine; then
+            print_success "PostgreSQL image pulled: postgres:15-alpine"
+        else
+            print_error "Failed to pull PostgreSQL image"
+            exit 1
+        fi
+    fi
+
+    print_success "All images pulled successfully"
 }
 
 start_services() {

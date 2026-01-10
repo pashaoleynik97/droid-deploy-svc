@@ -37,6 +37,8 @@ class SecurityConfig(
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }  // Stateless session
             .authorizeHttpRequests { auth ->
                 auth
+                    .requestMatchers("/actuator/health").permitAll()
+                    .requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()  // Allow anonymous access to auth endpoints
                     .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()  // Allow anonymous access to API documentation
                     .anyRequest().authenticated()  // All other endpoints require authentication
